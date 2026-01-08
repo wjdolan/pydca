@@ -6,7 +6,6 @@ county, field, completion year, and other categories.
 
 from typing import Optional
 
-import numpy as np
 import pandas as pd
 
 from .logging_config import get_logger
@@ -234,7 +233,9 @@ def cross_tabulate_metrics(
         raise ValueError(f"Row category '{row_category}' not found")
     if col_category not in results_df.columns:
         raise ValueError(f"Column category '{col_category}' not found")
-    if metric not in results_df.columns:
+
+    # For count aggregation, metric column is not needed
+    if agg_func != "count" and metric not in results_df.columns:
         raise ValueError(f"Metric '{metric}' not found")
 
     agg_func_map = {
@@ -253,7 +254,6 @@ def cross_tabulate_metrics(
         "count": lambda: pd.crosstab(
             results_df[row_category],
             results_df[col_category],
-            aggfunc="count",
         ),
     }
 

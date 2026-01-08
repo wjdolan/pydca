@@ -1,6 +1,5 @@
 """Tests for portfolio analysis and aggregation."""
 
-import numpy as np
 import pandas as pd
 import pytest
 
@@ -167,12 +166,30 @@ class TestCrossTabulateMetrics:
         """Test with missing required columns."""
         results_df = pd.DataFrame({"well_id": ["W1"], "npv": [1000000]})
 
+        # Missing row/col categories should raise error
         with pytest.raises(ValueError):
             cross_tabulate_metrics(
                 results_df,
                 row_category="operator",
                 col_category="county",
                 metric="npv",
+            )
+
+        # Missing metric for sum/mean should raise error
+        results_df2 = pd.DataFrame(
+            {
+                "well_id": ["W1"],
+                "operator": ["Op_A"],
+                "county": ["County_X"],
+            }
+        )
+        with pytest.raises(ValueError, match="Metric"):
+            cross_tabulate_metrics(
+                results_df2,
+                row_category="operator",
+                col_category="county",
+                metric="npv",
+                agg_func="sum",
             )
 
 
@@ -252,9 +269,11 @@ class TestEdgeCases:
             }
         )
 
-        # Should handle missing metrics gracefully
+        # Should handle missing metrics gracefully - only well_count will be present
         aggregated = aggregate_by_category(
             results_df, category_col="operator", metrics=["eur", "npv"]
         )
 
         assert len(aggregated) == 2
+        assert "well_count" in aggregated.columns
+        # Metrics that don't exist should be filtered out automatically
