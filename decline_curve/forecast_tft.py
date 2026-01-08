@@ -636,7 +636,24 @@ if TORCH_AVAILABLE:
 
         forecasts = {}
         for i, phase in enumerate(self.phases):
+            # Clip to non-negative
             phase_forecast = np.clip(forecast[:, i], 0, None)
+
+            # Apply physics-informed constraints
+            from .physics_informed import apply_physics_constraints
+
+            # Get historical data for continuity
+            historical = well_data[phase].values if phase in well_data.columns else None
+
+            # Apply constraints
+            phase_forecast = apply_physics_constraints(
+                phase_forecast,
+                historical=historical,
+                min_rate=0.0,
+                max_increase=0.1,
+                enforce_decline=False,
+            )
+
             forecasts[phase] = pd.Series(
                 phase_forecast, index=forecast_dates, name=phase
             )

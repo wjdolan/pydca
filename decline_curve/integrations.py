@@ -3,6 +3,7 @@
 This module provides integration points with other libraries in the ecosystem:
 - pygeomodeling: Advanced Gaussian Process Regression and Kriging
 - geosuite: Professional subsurface analysis tools
+- signalplot: Professional plotting styles
 
 These integrations allow users to leverage the full ecosystem of tools
 for comprehensive reservoir analysis workflows.
@@ -19,7 +20,7 @@ logger = get_logger(__name__)
 
 # Try to import pygeomodeling
 try:
-    import pygeomodeling
+    import pygeomodeling  # noqa: F401
 
     PYGEO_AVAILABLE = True
 except ImportError:
@@ -28,7 +29,7 @@ except ImportError:
 
 # Try to import geosuite
 try:
-    import geosuite
+    import geosuite  # noqa: F401
 
     GEOSUITE_AVAILABLE = True
 except ImportError:
@@ -37,7 +38,7 @@ except ImportError:
 
 # Try to import signalplot
 try:
-    import signalplot
+    import signalplot  # noqa: F401
 
     SIGNALPLOT_AVAILABLE = True
 except ImportError:
@@ -122,20 +123,62 @@ def krige_eur_with_pygeomodeling(
     # Use pygeomodeling's toolkit
     toolkit = UnifiedSPE9Toolkit()
 
-    # Create sklearn GP model (pygeomodeling's interface)
+    # Try multiple API patterns for creating and using models
     try:
-        model = toolkit.create_sklearn_model("gpr", kernel_type="combined")
-        model.fit(X_train, y_train)
+        # Pattern 1: create_sklearn_model method
+        if hasattr(toolkit, "create_sklearn_model"):
+            try:
+                model = toolkit.create_sklearn_model("gpr", kernel_type="combined")
+                model.fit(X_train, y_train)
+                predictions, uncertainty = model.predict(
+                    target_locations, return_std=True
+                )
+                logger.info(
+                    f"Kriging with pygeomodeling complete: {len(predictions)} predictions "
+                    f"(method: pygeomodeling_gpr via create_sklearn_model, n_wells: {len(eur_valid)})"
+                )
+                return predictions, uncertainty
+            except Exception as e:
+                logger.debug(f"create_sklearn_model failed: {e}")
 
-        # Predict
-        predictions, uncertainty = model.predict(target_locations, return_std=True)
+        # Pattern 2: create_model method
+        if hasattr(toolkit, "create_model"):
+            try:
+                model = toolkit.create_model("gpr", backend="sklearn")
+                model.fit(X_train, y_train)
+                predictions, uncertainty = model.predict(
+                    target_locations, return_std=True
+                )
+                logger.info(
+                    f"Kriging with pygeomodeling complete: {len(predictions)} predictions "
+                    f"(method: pygeomodeling_gpr via create_model, n_wells: {len(eur_valid)})"
+                )
+                return predictions, uncertainty
+            except Exception as e:
+                logger.debug(f"create_model failed: {e}")
 
-        logger.info(
-            f"Kriging with pygeomodeling complete: {len(predictions)} predictions "
-            f"(method: pygeomodeling_gpr, n_wells: {len(eur_valid)})"
+        # Pattern 3: Direct sklearn GP import from pygeomodeling
+        try:
+            from pygeomodeling.models import GaussianProcessRegressor as PyGeoGPR
+
+            model = PyGeoGPR()
+            model.fit(X_train, y_train)
+            predictions, uncertainty = model.predict(target_locations, return_std=True)
+            logger.info(
+                f"Kriging with pygeomodeling complete: {len(predictions)} predictions "
+                f"(method: pygeomodeling_gpr direct, n_wells: {len(eur_valid)})"
+            )
+            return predictions, uncertainty
+        except ImportError:
+            pass
+        except Exception as e:
+            logger.debug(f"Direct PyGeoGPR failed: {e}")
+
+        # If all patterns fail, raise informative error
+        raise RuntimeError(
+            "Could not find compatible pygeomodeling API. "
+            "Tried: create_sklearn_model, create_model, and direct GaussianProcessRegressor import."
         )
-
-        return predictions, uncertainty
 
     except Exception as e:
         logger.error(f"pygeomodeling kriging failed: {e}")
@@ -186,28 +229,97 @@ def load_well_data_with_geosuite(
                 None,
             )
 
-        loaders = {
-            "las": lambda: _load_las_file(file_path),
-            "csv": lambda: pd.read_csv(file_path),
-            "xlsx": lambda: pd.read_excel(file_path),
-        }
+        # Try multiple geosuite API patterns
+        df = None
 
+        # Pattern 1: Direct load_well_data function
         if hasattr(geosuite, "load_well_data"):
-            df = geosuite.load_well_data(file_path, file_type=file_type)
-        elif hasattr(geosuite, "data") and hasattr(geosuite.data, "load"):
-            df = geosuite.data.load(file_path)
-        else:
-            logger.warning("geosuite data loading API not found, using pandas fallback")
-            loader = loaders.get(file_type)
-            if loader is None:
+            try:
+                df = geosuite.load_well_data(file_path, file_type=file_type)
+                logger.debug("Loaded data using geosuite.load_well_data")
+            except Exception as e:
+                logger.debug(f"geosuite.load_well_data failed: {e}")
+
+        # Pattern 2: geosuite.data.load
+        if df is None and hasattr(geosuite, "data") and hasattr(geosuite.data, "load"):
+            try:
+                df = geosuite.data.load(file_path)
+                logger.debug("Loaded data using geosuite.data.load")
+            except Exception as e:
+                logger.debug(f"geosuite.data.load failed: {e}")
+
+        # Pattern 3: geosuite.io.load_las or similar
+        if df is None and hasattr(geosuite, "io"):
+            if hasattr(geosuite.io, "load_las") and file_type == "las":
+                try:
+                    df = geosuite.io.load_las(file_path)
+                    logger.debug("Loaded data using geosuite.io.load_las")
+                except Exception as e:
+                    logger.debug(f"geosuite.io.load_las failed: {e}")
+            elif hasattr(geosuite.io, "load") and file_type:
+                try:
+                    df = geosuite.io.load(file_path, file_type=file_type)
+                    logger.debug(f"Loaded data using geosuite.io.load({file_type})")
+                except Exception as e:
+                    logger.debug(f"geosuite.io.load failed: {e}")
+
+        # Pattern 4: Fallback to pandas with LAS support
+        if df is None:
+            logger.warning("geosuite data loading API not found, using fallback")
+            if file_type == "las":
+                df = _load_las_file(file_path)
+            elif file_type == "csv":
+                df = pd.read_csv(file_path)
+            elif file_type in ("xlsx", "xls"):
+                df = pd.read_excel(file_path)
+            else:
                 raise ValueError(f"Unknown file type: {file_type}")
-            df = loader()
 
         return df
 
     except Exception as e:
         logger.error(f"Failed to load data with geosuite: {e}")
         raise
+
+
+def _load_las_file(file_path: str) -> pd.DataFrame:
+    """Load LAS file using available libraries.
+
+    Tries lasio first, then falls back to other methods.
+
+    Args:
+        file_path: Path to LAS file
+
+    Returns:
+        DataFrame with well log data
+    """
+    # Try lasio (most common LAS library)
+    try:
+        import lasio
+
+        las = lasio.read(file_path)
+        df = las.df()
+        # Add depth column if not present
+        if df.index.name != "DEPTH" and "DEPTH" not in df.columns:
+            df.reset_index(inplace=True)
+        return df
+    except ImportError:
+        pass
+    except Exception as e:
+        logger.warning(f"lasio failed to load {file_path}: {e}")
+
+    # Try geosuite if available
+    if GEOSUITE_AVAILABLE:
+        try:
+            if hasattr(geosuite, "io") and hasattr(geosuite.io, "read_las"):
+                return geosuite.io.read_las(file_path)
+        except Exception as e:
+            logger.warning(f"geosuite LAS loading failed: {e}")
+
+    # Final fallback: raise error
+    raise ImportError(
+        "LAS file loading requires lasio. Install with: pip install lasio"
+    )
 
 
 def calculate_petrophysical_properties_with_geosuite(
@@ -242,30 +354,118 @@ def calculate_petrophysical_properties_with_geosuite(
         raise ImportError("geosuite not available. Install with: pip install geosuite")
 
     try:
-        # Use geosuite's petrophysics functions
-        # This is a placeholder - adjust based on actual geosuite API
         results = well_logs.copy()
 
+        # Try multiple geosuite petrophysics API patterns
+        calculated = False
+
+        # Pattern 1: geosuite.petro module
         if hasattr(geosuite, "petro"):
-            # Calculate water saturation if resistivity available
-            if "RT" in well_logs.columns or "RES" in well_logs.columns:
+            try:
+                # Calculate water saturation if resistivity available
+                if "RT" in well_logs.columns or "RES" in well_logs.columns:
+                    rt_col = "RT" if "RT" in well_logs.columns else "RES"
+
+                    # Try different method names
+                    sw_methods = [
+                        "calculate_water_saturation",
+                        "water_saturation",
+                        "sw",
+                        "calculate_sw",
+                    ]
+                    for method_name in sw_methods:
+                        if hasattr(geosuite.petro, method_name):
+                            method = getattr(geosuite.petro, method_name)
+                            # Try different parameter patterns
+                            try:
+                                if nphi_col in well_logs.columns:
+                                    results["SW"] = method(
+                                        resistivity=well_logs[rt_col],
+                                        porosity=well_logs[nphi_col],
+                                    )
+                                else:
+                                    results["SW"] = method(
+                                        resistivity=well_logs[rt_col],
+                                        porosity=0.2,  # Default
+                                    )
+                                calculated = True
+                                logger.debug(
+                                    f"Calculated SW using geosuite.petro.{method_name}"
+                                )
+                                break
+                            except (TypeError, ValueError):
+                                continue
+
+                # Calculate porosity if density available
+                if rhob_col in well_logs.columns:
+                    phi_methods = [
+                        "calculate_porosity",
+                        "porosity",
+                        "phi",
+                        "calculate_phi",
+                    ]
+                    for method_name in phi_methods:
+                        if hasattr(geosuite.petro, method_name):
+                            method = getattr(geosuite.petro, method_name)
+                            try:
+                                results["PHI"] = method(
+                                    density=well_logs[rhob_col],
+                                    matrix_density=2.65,  # Default sandstone
+                                )
+                                calculated = True
+                                logger.debug(
+                                    f"Calculated PHI using geosuite.petro.{method_name}"
+                                )
+                                break
+                            except (TypeError, ValueError):
+                                continue
+            except Exception as e:
+                logger.debug(f"geosuite.petro methods failed: {e}")
+
+        # Pattern 2: geosuite.petrophysics module
+        if not calculated and hasattr(geosuite, "petrophysics"):
+            try:
+                petro = geosuite.petrophysics
+                if "RT" in well_logs.columns or "RES" in well_logs.columns:
+                    rt_col = "RT" if "RT" in well_logs.columns else "RES"
+                    if hasattr(petro, "sw"):
+                        results["SW"] = petro.sw(
+                            well_logs[rt_col], well_logs.get(nphi_col, 0.2)
+                        )
+                        calculated = True
+                if rhob_col in well_logs.columns and hasattr(petro, "phi"):
+                    results["PHI"] = petro.phi(well_logs[rhob_col])
+                    calculated = True
+            except Exception as e:
+                logger.debug(f"geosuite.petrophysics methods failed: {e}")
+
+        # Pattern 3: Direct function calls
+        if not calculated:
+            # Try top-level functions
+            if hasattr(geosuite, "calculate_sw") and (
+                "RT" in well_logs.columns or "RES" in well_logs.columns
+            ):
                 rt_col = "RT" if "RT" in well_logs.columns else "RES"
-                if hasattr(geosuite.petro, "calculate_water_saturation"):
-                    results["SW"] = geosuite.petro.calculate_water_saturation(
-                        resistivity=well_logs[rt_col],
-                        porosity=well_logs.get(nphi_col, 0.2),
-                        rw=0.05,  # Default water resistivity
-                    )
+                try:
+                    results["SW"] = geosuite.calculate_sw(well_logs[rt_col])
+                    calculated = True
+                except Exception:
+                    pass
 
-            # Calculate porosity if density available
-            if rhob_col in well_logs.columns:
-                if hasattr(geosuite.petro, "calculate_porosity"):
-                    results["PHI"] = geosuite.petro.calculate_porosity(
-                        density=well_logs[rhob_col],
-                        matrix_density=2.65,  # Default sandstone
-                    )
+            if hasattr(geosuite, "calculate_phi") and rhob_col in well_logs.columns:
+                try:
+                    results["PHI"] = geosuite.calculate_phi(well_logs[rhob_col])
+                    calculated = True
+                except Exception:
+                    pass
 
-        logger.info("Calculated petrophysical properties with geosuite")
+        if calculated:
+            logger.info("Calculated petrophysical properties with geosuite")
+        else:
+            logger.warning(
+                "Could not find geosuite petrophysics API, returning original data"
+            )
+
         return results
 
     except Exception as e:

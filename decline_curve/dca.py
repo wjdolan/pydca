@@ -37,6 +37,8 @@ def forecast(
         "moving_average",
         "linear_trend",
         "holt_winters",
+        "material_balance",
+        "pressure_decline",
     ] = "arps",
     kind: Optional[Literal["exponential", "harmonic", "hyperbolic"]] = "hyperbolic",
     horizon: int = 12,
@@ -224,6 +226,28 @@ def forecast(
                 "Ensemble forecasting requires PyTorch for ML models. "
                 "Install with: pip install torch"
             )
+
+    # Handle physics-informed models
+    elif model == "material_balance":
+        from .physics_informed import material_balance_forecast
+
+        result = material_balance_forecast(
+            production_data=series,
+            material_balance_params=None,  # Can be passed via kwargs in future
+            horizon=horizon,
+        )
+        if verbose:
+            logger.debug(f"Material balance forecast, horizon: {horizon}")
+        return result
+
+    elif model == "pressure_decline":
+        # For pressure decline, need pressure data
+        # If not provided, raise error
+        raise ValueError(
+            "pressure_decline model requires pressure data. "
+            "Use physics_informed.pressure_decline_forecast() directly "
+            "with pressure_data parameter."
+        )
 
     # Standard models (Arps, ARIMA, TimesFM, Chronos, statistical methods)
     else:

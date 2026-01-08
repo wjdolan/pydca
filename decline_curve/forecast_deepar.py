@@ -496,8 +496,23 @@ if TORCH_AVAILABLE:
                         )
                         quantile_values_denorm = quantile_values_denorm_full[:, i]
 
-                    # Clip to non-negative
+                    # Apply physics-informed constraints
+                    from .physics_informed import apply_physics_constraints
+
+                    # Get historical data for continuity
+                    historical = (
+                        well_data[phase].values if phase in well_data.columns else None
+                    )
+
+                    # Clip to non-negative and apply constraints
                     quantile_values_denorm = np.clip(quantile_values_denorm, 0, None)
+                    quantile_values_denorm = apply_physics_constraints(
+                        quantile_values_denorm,
+                        historical=historical,
+                        min_rate=0.0,
+                        max_increase=0.1,
+                        enforce_decline=False,
+                    )
                     phase_quantiles[f"q{int(q*100)}"] = pd.Series(
                         quantile_values_denorm,
                         index=forecast_dates,
