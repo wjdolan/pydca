@@ -115,6 +115,187 @@ class OutputConfig:
 
 
 @dataclass
+class BenchmarkConfig:
+    """Benchmark workflow configuration.
+
+    Attributes:
+        data: Data source configuration
+        model: Model configuration
+        output: Output configuration
+        top_n: Number of wells to process
+        n_jobs: Number of parallel jobs
+        log_level: Logging level
+        log_file: Log file path
+    """
+
+    data: DataSourceConfig = field(default_factory=lambda: DataSourceConfig(path=""))
+    model: ModelConfig = field(default_factory=ModelConfig)
+    output: OutputConfig = field(default_factory=OutputConfig)
+    top_n: int = 10
+    n_jobs: int = -1
+    log_level: str = "INFO"
+    log_file: Optional[str] = None
+
+    @classmethod
+    def from_dict(cls, config_dict: Dict[str, Any]) -> "BenchmarkConfig":
+        """Load configuration from dictionary."""
+        return cls(
+            data=DataSourceConfig(**config_dict.get("data", {})),
+            model=ModelConfig(**config_dict.get("model", {})),
+            output=OutputConfig(**config_dict.get("output", {})),
+            top_n=config_dict.get("top_n", 10),
+            n_jobs=config_dict.get("n_jobs", -1),
+            log_level=config_dict.get("log_level", "INFO"),
+            log_file=config_dict.get("log_file"),
+        )
+
+    @classmethod
+    def from_file(cls, config_path: str | Path) -> "BenchmarkConfig":
+        """Load configuration from file (auto-detect format)."""
+        config_path = Path(config_path)
+        suffix = config_path.suffix.lower()
+
+        if suffix in (".toml", ".tml"):
+            return cls.from_toml(config_path)
+        elif suffix in (".yaml", ".yml"):
+            return cls.from_yaml(config_path)
+        else:
+            raise ValueError(f"Unknown config format: {suffix}")
+
+    @classmethod
+    def from_toml(cls, config_path: Path) -> "BenchmarkConfig":
+        """Load configuration from TOML file."""
+        if not TOML_AVAILABLE:
+            raise ImportError(
+                "TOML support not available. Install with: pip install tomli"
+            )
+
+        try:
+            import tomli as toml_loader
+        except ImportError:
+            import tomllib as toml_loader
+
+        with open(config_path, "rb") as f:
+            config_dict = toml_loader.load(f)
+        return cls.from_dict(config_dict)
+
+    @classmethod
+    def from_yaml(cls, config_path: Path) -> "BenchmarkConfig":
+        """Load configuration from YAML file."""
+        if not YAML_AVAILABLE:
+            raise ImportError(
+                "YAML support not available. Install with: pip install pyyaml"
+            )
+
+        with open(config_path, "r") as f:
+            config_dict = yaml.safe_load(f)
+        return cls.from_dict(config_dict)
+
+
+@dataclass
+class SensitivityConfig:
+    """Sensitivity analysis workflow configuration.
+
+    Attributes:
+        param_grid: List of (qi, di, b) tuples or dict with ranges for grid search
+        prices: List of prices to test
+        opex: Operating cost per unit
+        discount_rate: Annual discount rate
+        t_max: Time horizon in months
+        econ_limit: Minimum economic production rate
+        dt: Time step in months
+        output: Output configuration
+        log_level: Logging level
+        log_file: Log file path
+    """
+
+    param_grid: List[tuple[float, float, float]] | Dict[str, List[float]] = field(
+        default_factory=list
+    )
+    prices: List[float] = field(default_factory=list)
+    opex: float = 15.0
+    discount_rate: float = 0.10
+    t_max: float = 240.0
+    econ_limit: float = 10.0
+    dt: float = 1.0
+    output: OutputConfig = field(default_factory=OutputConfig)
+    log_level: str = "INFO"
+    log_file: Optional[str] = None
+
+    @classmethod
+    def from_dict(cls, config_dict: Dict[str, Any]) -> "SensitivityConfig":
+        """Load configuration from dictionary."""
+        param_grid = config_dict.get("param_grid", [])
+        # Convert dict ranges to grid if needed
+        if isinstance(param_grid, dict):
+            import itertools
+
+            ranges = param_grid
+            param_grid = list(
+                itertools.product(
+                    ranges.get("qi", [1000]),
+                    ranges.get("di", [0.1]),
+                    ranges.get("b", [0.5]),
+                )
+            )
+
+        return cls(
+            param_grid=param_grid,
+            prices=config_dict.get("prices", [50, 60, 70, 80, 90]),
+            opex=config_dict.get("opex", 15.0),
+            discount_rate=config_dict.get("discount_rate", 0.10),
+            t_max=config_dict.get("t_max", 240.0),
+            econ_limit=config_dict.get("econ_limit", 10.0),
+            dt=config_dict.get("dt", 1.0),
+            output=OutputConfig(**config_dict.get("output", {})),
+            log_level=config_dict.get("log_level", "INFO"),
+            log_file=config_dict.get("log_file"),
+        )
+
+    @classmethod
+    def from_file(cls, config_path: str | Path) -> "SensitivityConfig":
+        """Load configuration from file (auto-detect format)."""
+        config_path = Path(config_path)
+        suffix = config_path.suffix.lower()
+
+        if suffix in (".toml", ".tml"):
+            return cls.from_toml(config_path)
+        elif suffix in (".yaml", ".yml"):
+            return cls.from_yaml(config_path)
+        else:
+            raise ValueError(f"Unknown config format: {suffix}")
+
+    @classmethod
+    def from_toml(cls, config_path: Path) -> "SensitivityConfig":
+        """Load configuration from TOML file."""
+        if not TOML_AVAILABLE:
+            raise ImportError(
+                "TOML support not available. Install with: pip install tomli"
+            )
+
+        try:
+            import tomli as toml_loader
+        except ImportError:
+            import tomllib as toml_loader
+
+        with open(config_path, "rb") as f:
+            config_dict = toml_loader.load(f)
+        return cls.from_dict(config_dict)
+
+    @classmethod
+    def from_yaml(cls, config_path: Path) -> "SensitivityConfig":
+        """Load configuration from YAML file."""
+        if not YAML_AVAILABLE:
+            raise ImportError(
+                "YAML support not available. Install with: pip install pyyaml"
+            )
+
+        with open(config_path, "r") as f:
+            config_dict = yaml.safe_load(f)
+        return cls.from_dict(config_dict)
+
+
+@dataclass
 class BatchJobConfig:
     """Complete batch job configuration.
 

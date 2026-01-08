@@ -1,5 +1,6 @@
 """Main API for decline curve analysis and forecasting."""
 
+from pathlib import Path
 from typing import Any, Literal, Optional
 
 import pandas as pd
@@ -7,11 +8,19 @@ import pandas as pd
 from .economics import economic_metrics
 from .evaluate import mae, rmse, smape
 from .forecast import Forecaster
-from .logging_config import get_logger
+from .logging_config import configure_logging, get_logger
 from .models import ArpsParams, fit_arps, predict_arps
 from .plot import plot_forecast
 from .reserves import forecast_and_reserves
-from .sensitivity import run_sensitivity
+from .runner import FieldScaleRunner, RunnerConfig, WellResult
+from .sensitivity import run_sensitivity as _run_sensitivity
+
+try:
+    from .config import BatchJobConfig, BenchmarkConfig, SensitivityConfig
+except ImportError:
+    BatchJobConfig = None
+    BenchmarkConfig = None
+    SensitivityConfig = None
 
 logger = get_logger(__name__)
 
@@ -318,7 +327,8 @@ def _benchmark_single_well(
 
 
 def benchmark(
-    df: pd.DataFrame,
+    df: pd.DataFrame | None = None,
+    config: str | Path | dict | Any = None,
     model: Literal[
         "arps",
         "timesfm",
@@ -342,21 +352,42 @@ def benchmark(
     """
     Benchmark forecasting models across multiple wells.
 
+    This function supports both config-driven and direct parameter usage.
+    If config is provided, it takes precedence over individual parameters.
+
     Args:
-        df: DataFrame with production data
-        model: Forecasting model to use
-        kind: Arps model type (if applicable)
-        horizon: Forecast horizon in months
-        well_col: Column name for well identifier
-        date_col: Column name for dates
-        value_col: Column name for production values
-        top_n: Number of wells to process
+        df: DataFrame with production data (required if config not provided)
+        config: Path to config file, dict, or BenchmarkConfig (optional)
+        model: Forecasting model to use (used if config not provided)
+        kind: Arps model type (if applicable) (used if config not provided)
+        horizon: Forecast horizon in months (used if config not provided)
+        well_col: Column name for well identifier (used if config not provided)
+        date_col: Column name for dates (used if config not provided)
+        value_col: Column name for production values (used if config not provided)
+        top_n: Number of wells to process (used if config not provided)
         verbose: Print progress messages
         n_jobs: Number of parallel jobs (-1 for all cores, 1 for sequential)
+            (used if config not provided)
 
     Returns:
         DataFrame with metrics for each well
+
+    Example:
+        >>> import decline_curve as dca
+        >>> # Using config file
+        >>> results = dca.benchmark(config='benchmark_config.toml')
+        >>> # Using direct parameters
+        >>> results = dca.benchmark(df, model='arps', top_n=10)
     """
+    # If config provided, delegate to run_benchmark
+    if config is not None:
+        result = run_benchmark(config)
+        return result["results"]  # Return just the results DataFrame
+
+    # Otherwise use direct parameters
+    if df is None:
+        raise ValueError("Either df or config must be provided")
+
     wells = df[well_col].unique()[:top_n]
 
     if JOBLIB_AVAILABLE and n_jobs != 1:
@@ -417,30 +448,57 @@ def benchmark(
 
 
 def sensitivity_analysis(
-    param_grid: list[tuple[float, float, float]],
-    prices: list[float],
-    opex: float,
+    param_grid: list[tuple[float, float, float]] | dict | None = None,
+    prices: list[float] | None = None,
+    opex: float | None = None,
     discount_rate: float = 0.10,
     t_max: float = 240,
     econ_limit: float = 10.0,
     dt: float = 1.0,
+    config: str | Path | dict | Any = None,
 ) -> pd.DataFrame:
     """
     Run sensitivity analysis across Arps parameters and oil/gas prices.
 
+    This function supports both config-driven and direct parameter usage.
+    If config is provided, it takes precedence over individual parameters.
+
     Args:
-        param_grid: List of (qi, di, b) tuples to test
-        prices: List of oil/gas prices to test
-        opex: Operating cost per unit
-        discount_rate: Annual discount rate (default 0.10)
-        t_max: Time horizon in months (default 240)
+        param_grid: List of (qi, di, b) tuples to test or dict with ranges
+            (used if config not provided)
+        prices: List of oil/gas prices to test (used if config not provided)
+        opex: Operating cost per unit (used if config not provided)
+        discount_rate: Annual discount rate (default 0.10) (used if config not provided)
+        t_max: Time horizon in months (default 240) (used if config not provided)
         econ_limit: Minimum economic production rate (default 10.0)
-        dt: Time step in months (default 1.0)
+            (used if config not provided)
+        dt: Time step in months (default 1.0) (used if config not provided)
+        config: Path to config file, dict, or SensitivityConfig (optional)
 
     Returns:
         DataFrame with sensitivity results including EUR, NPV, and payback
+
+    Example:
+        >>> import decline_curve as dca
+        >>> # Using config file
+        >>> results = dca.sensitivity_analysis(config='sensitivity_config.toml')
+        >>> # Using direct parameters
+        >>> results = dca.sensitivity_analysis(
+        ...     param_grid=[(1000, 0.1, 0.5)], prices=[70, 80]
+        ... )
     """
-    return run_sensitivity(
+    # If config provided, delegate to run_sensitivity_analysis
+    if config is not None:
+        result = run_sensitivity_analysis(config)
+        return result["results"]  # Return just the results DataFrame
+
+    # Otherwise use direct parameters
+    if param_grid is None or prices is None or opex is None:
+        raise ValueError(
+            "Either config or all of param_grid, prices, and opex must be provided"
+        )
+
+    return _run_sensitivity(
         param_grid, prices, opex, discount_rate, t_max, econ_limit, dt
     )
 
@@ -551,7 +609,8 @@ def single_well(
 
 
 def batch_jobs(
-    df: pd.DataFrame,
+    df: pd.DataFrame | None = None,
+    config: str | Path | dict | Any = None,
     well_col: str = "well_id",
     date_col: str = "date",
     value_col: str = "oil_bbl",
@@ -564,18 +623,21 @@ def batch_jobs(
     """
     Run batch decline curve analysis across multiple wells.
 
-    This is the main entry point for batch processing. It processes multiple
-    wells in parallel and returns a summary DataFrame with parameters and metrics.
+    This function supports both config-driven and direct parameter usage.
+    If config is provided, it takes precedence over individual parameters.
 
     Args:
         df: DataFrame with production data for multiple wells
-        well_col: Column name for well identifier
-        date_col: Column name for dates
-        value_col: Column name for production values
-        model: Forecasting model ('arps' or 'arima')
-        kind: Arps decline type (if model='arps')
-        horizon: Forecast horizon in months
+            (required if config not provided)
+        config: Path to config file, dict, or BatchJobConfig (optional)
+        well_col: Column name for well identifier (used if config not provided)
+        date_col: Column name for dates (used if config not provided)
+        value_col: Column name for production values (used if config not provided)
+        model: Forecasting model ('arps' or 'arima') (used if config not provided)
+        kind: Arps decline type (if model='arps') (used if config not provided)
+        horizon: Forecast horizon in months (used if config not provided)
         n_jobs: Number of parallel jobs (-1 for all cores, 1 for sequential)
+            (used if config not provided)
         verbose: Print progress messages
 
     Returns:
@@ -588,10 +650,19 @@ def batch_jobs(
     Example:
         >>> import pandas as pd
         >>> import decline_curve as dca
-        >>> # df has columns: well_id, date, oil_bbl
+        >>> # Using config file
+        >>> results = dca.batch_jobs(config='config.toml')
+        >>> # Using direct parameters
         >>> results = dca.batch_jobs(df, well_col='well_id', model='arps')
     """
-    if well_col not in df.columns:
+    # If config provided, delegate to run_batch_job
+    if config is not None:
+        result = run_batch_job(config)
+        return result["parameters"]  # Return just the parameters DataFrame
+
+    # Otherwise use direct parameters
+    if df is None:
+        raise ValueError("Either df or config must be provided")
         raise ValueError(f"Column '{well_col}' not found in DataFrame")
     if date_col not in df.columns:
         raise ValueError(f"Column '{date_col}' not found in DataFrame")
@@ -797,3 +868,430 @@ def type_curves(
     type_curve = pd.Series(q_curve, index=dates, name=f"type_curve_{group_name}")
 
     return type_curve
+
+
+def run_batch_job(config_path: str | Path | dict | Any) -> dict:
+    """
+    Run a complete batch decline curve analysis from configuration.
+
+    This is the main config-driven entry point. It loads configuration from a file
+    or dict and runs the complete workflow: data loading, validation, forecasting,
+    economic analysis, and output generation.
+
+    Args:
+        config_path: Path to TOML/YAML config file, dict, or BatchJobConfig instance
+
+    Returns:
+        Dictionary with:
+        - 'parameters': DataFrame with fitted parameters per well
+        - 'forecasts': DataFrame with forecasts per well
+        - 'summary': Summary statistics
+        - 'config': Configuration used
+
+    Example:
+        >>> import decline_curve as dca
+        >>> # Using config file
+        >>> results = dca.run_batch_job('config.toml')
+        >>> # Using dict
+        >>> config_dict = {'data': {'path': 'data.csv', ...}, ...}
+        >>> results = dca.run_batch_job(config_dict)
+    """
+    from pathlib import Path
+
+    from .config import BatchJobConfig
+
+    # Load configuration
+    if isinstance(config_path, BatchJobConfig):
+        config = config_path
+    elif isinstance(config_path, (str, Path)):
+        config = BatchJobConfig.from_file(config_path)
+    elif isinstance(config_path, dict):
+        config = BatchJobConfig.from_dict(config_path)
+    else:
+        raise ValueError(
+            "config_path must be a file path (str/Path), dict, or BatchJobConfig"
+        )
+
+    # Configure logging
+    configure_logging(
+        level=getattr(__import__("logging"), config.log_level), log_file=config.log_file
+    )
+    logger.info(
+        f"Running batch job from config: "
+        f"{config_path if isinstance(config_path, (str, Path)) else 'dict'}"
+    )
+
+    # Load data
+    logger.info(f"Loading data from: {config.data.path}")
+    data_path = Path(config.data.path)
+    if not data_path.exists():
+        raise FileNotFoundError(f"Data file not found: {config.data.path}")
+
+    if config.data.format == "csv":
+        df = pd.read_csv(data_path)
+    elif config.data.format == "parquet":
+        df = pd.read_parquet(data_path)
+    else:
+        raise ValueError(f"Unsupported format: {config.data.format}")
+
+    # Convert date column
+    df[config.data.date_col] = pd.to_datetime(df[config.data.date_col])
+
+    # Validate and standardize
+    from .schemas import ProductionInputSchema, ProductionOutputSchema
+
+    df_standard = ProductionInputSchema.standardize(df)
+    # Validate will raise ValueError if invalid
+    ProductionInputSchema.validate(df_standard)
+
+    logger.info(
+        f"Loaded {len(df_standard):,} records for "
+        f"{df_standard[config.data.well_id_col].nunique():,} wells"
+    )
+
+    # Define forecast function from config
+    def forecast_well_func(well_data: pd.DataFrame) -> WellResult:
+        """Forecast function for a single well."""
+        well_id = well_data[config.data.well_id_col].iloc[0]
+        well_data = well_data.sort_values(config.data.date_col)
+
+        # Create production series
+        series = well_data.set_index(config.data.date_col)[config.data.value_col]
+        series = series.asfreq("MS", fill_value=0)
+
+        # Filter to valid production
+        series = series[series > 0]
+
+        if len(series) < 3:  # Minimum data requirement
+            return WellResult(well_id=well_id, success=False, error="Insufficient data")
+
+        try:
+            model_params = getattr(config.model, "params", {})
+            forecast_result = forecast(
+                series,
+                model=config.model.model,
+                kind=config.model.kind if config.model.model == "arps" else None,
+                horizon=config.model.horizon,
+                **model_params,
+            )
+
+            # Calculate economic metrics if provided
+            metrics = {}
+            if config.economics.price and config.economics.opex:
+                econ = economic_metrics(
+                    forecast_result.values,
+                    config.economics.price,
+                    config.economics.opex,
+                    config.economics.discount_rate,
+                )
+                metrics.update(econ)
+
+            # Extract parameters for Arps models
+            params = None
+            if config.model.model == "arps":
+                try:
+                    import numpy as np
+
+                    t = np.arange(len(series))
+                    q = series.values
+                    fitted_params = fit_arps(
+                        t, q, kind=config.model.kind or "hyperbolic"
+                    )
+                    params = {
+                        "qi": fitted_params.qi,
+                        "di": fitted_params.di,
+                        "b": fitted_params.b,
+                        "kind": config.model.kind or "hyperbolic",
+                    }
+                except Exception:
+                    pass
+
+            return WellResult(
+                well_id=well_id,
+                success=True,
+                forecast=forecast_result,
+                params=params,
+                metrics=metrics,
+            )
+        except Exception as e:
+            logger.warning(f"Well {well_id} failed: {e}")
+            return WellResult(well_id=well_id, success=False, error=str(e))
+
+    # Run analysis using runner
+    runner_config = RunnerConfig(
+        n_jobs=config.n_jobs,
+        chunk_size=config.chunk_size,
+        max_retries=config.max_retries,
+        log_level=config.log_level,
+        log_file=config.log_file,
+    )
+
+    runner = FieldScaleRunner(runner_config)
+    results = runner.run(
+        df_standard,
+        forecast_func=forecast_well_func,
+        well_id_col=config.data.well_id_col,
+    )
+
+    # Convert to output schema
+    output_schema = ProductionOutputSchema.from_runner_results(results)
+    parameters_df, forecasts_df, events_df = output_schema.to_dataframes()
+
+    # Save outputs
+    output_dir = Path(config.output.output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    saved_files = []
+
+    if config.output.save_parameters:
+        output_path = output_dir / f"parameters.{config.output.format}"
+        if config.output.format == "csv":
+            parameters_df.to_csv(output_path, index=False)
+        elif config.output.format == "parquet":
+            parameters_df.to_parquet(output_path, index=False)
+        saved_files.append(str(output_path))
+        logger.info(f"Saved parameters to {output_path}")
+
+    if config.output.save_forecasts:
+        output_path = output_dir / f"forecasts.{config.output.format}"
+        if config.output.format == "csv":
+            forecasts_df.to_csv(output_path, index=False)
+        elif config.output.format == "parquet":
+            forecasts_df.to_parquet(output_path, index=False)
+        saved_files.append(str(output_path))
+        logger.info(f"Saved forecasts to {output_path}")
+
+    if config.output.save_reports:
+        from .reports import generate_field_pdf_report
+
+        well_results = parameters_df.to_dict("records")
+        report_path = output_dir / "field_report.pdf"
+        generate_field_pdf_report(well_results, output_path=report_path)
+        saved_files.append(str(report_path))
+        logger.info(f"Saved report to {report_path}")
+
+    logger.info(
+        f"Batch job complete: {results.summary.successful_wells} successful, "
+        f"{results.summary.failed_wells} failed"
+    )
+
+    return {
+        "parameters": parameters_df,
+        "forecasts": forecasts_df,
+        "events": events_df,
+        "summary": results.summary,
+        "config": config,
+        "output_dir": str(output_dir),
+        "saved_files": saved_files,
+    }
+
+
+def run_benchmark(config_path: str | Path | dict | Any) -> dict:
+    """
+    Run a complete benchmark analysis from configuration.
+
+    This is the config-driven entry point for benchmarking workflows.
+
+    Args:
+        config_path: Path to TOML/YAML config file, dict, or BenchmarkConfig instance
+
+    Returns:
+        Dictionary with:
+        - 'results': DataFrame with metrics for each well
+        - 'config': Configuration used
+        - 'output_dir': Output directory
+        - 'saved_files': List of saved file paths
+
+    Example:
+        >>> import decline_curve as dca
+        >>> # Using config file
+        >>> results = dca.run_benchmark('benchmark_config.toml')
+        >>> # Using dict
+        >>> config_dict = {'data': {'path': 'data.csv', ...}, ...}
+        >>> results = dca.run_benchmark(config_dict)
+    """
+    from .config import BenchmarkConfig
+
+    # Load configuration
+    if isinstance(config_path, BenchmarkConfig):
+        config = config_path
+    elif isinstance(config_path, (str, Path)):
+        config = BenchmarkConfig.from_file(config_path)
+    elif isinstance(config_path, dict):
+        config = BenchmarkConfig.from_dict(config_path)
+    else:
+        raise ValueError(
+            "config_path must be a file path (str/Path), dict, or BenchmarkConfig"
+        )
+
+    # Configure logging
+    configure_logging(
+        level=getattr(__import__("logging"), config.log_level), log_file=config.log_file
+    )
+    logger.info(
+        f"Running benchmark from config: "
+        f"{config_path if isinstance(config_path, (str, Path)) else 'dict'}"
+    )
+
+    # Load data
+    logger.info(f"Loading data from: {config.data.path}")
+    data_path = Path(config.data.path)
+    if not data_path.exists():
+        raise FileNotFoundError(f"Data file not found: {config.data.path}")
+
+    if config.data.format == "csv":
+        df = pd.read_csv(data_path)
+    elif config.data.format == "parquet":
+        df = pd.read_parquet(data_path)
+    else:
+        raise ValueError(f"Unsupported format: {config.data.format}")
+
+    # Convert date column
+    df[config.data.date_col] = pd.to_datetime(df[config.data.date_col])
+
+    # Run benchmark using direct parameters from config
+    # (call internal function to avoid recursion)
+    wells = df[config.data.well_id_col].unique()[: config.top_n]
+
+    if JOBLIB_AVAILABLE and config.n_jobs != 1:
+        from joblib import Parallel, delayed
+
+        results_list = Parallel(n_jobs=config.n_jobs, verbose=0)(
+            delayed(_benchmark_single_well)(
+                wid,
+                df,
+                config.data.well_id_col,
+                config.data.date_col,
+                config.data.value_col,
+                config.model.model,
+                config.model.kind if config.model.model == "arps" else None,
+                config.model.horizon,
+            )
+            for wid in wells
+        )
+        out = [r for r in results_list if r is not None and "error" not in r]
+    else:
+        out = []
+        for wid in wells:
+            result = _benchmark_single_well(
+                wid,
+                df,
+                config.data.well_id_col,
+                config.data.date_col,
+                config.data.value_col,
+                config.model.model,
+                config.model.kind if config.model.model == "arps" else None,
+                config.model.horizon,
+            )
+            if result is not None and "error" not in result:
+                out.append(result)
+
+    results_df = pd.DataFrame(out) if out else pd.DataFrame()
+
+    # Save outputs
+    output_dir = Path(config.output.output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    saved_files = []
+
+    if config.output.save_parameters:
+        output_path = output_dir / f"benchmark_results.{config.output.format}"
+        if config.output.format == "csv":
+            results_df.to_csv(output_path, index=False)
+        elif config.output.format == "parquet":
+            results_df.to_parquet(output_path, index=False)
+        saved_files.append(str(output_path))
+        logger.info(f"Saved benchmark results to {output_path}")
+
+    logger.info(f"Benchmark complete: {len(results_df)} wells processed")
+
+    return {
+        "results": results_df,
+        "config": config,
+        "output_dir": str(output_dir),
+        "saved_files": saved_files,
+    }
+
+
+def run_sensitivity_analysis(config_path: str | Path | dict | Any) -> dict:
+    """
+    Run a complete sensitivity analysis from configuration.
+
+    This is the config-driven entry point for sensitivity analysis workflows.
+
+    Args:
+        config_path: Path to TOML/YAML config file, dict, or SensitivityConfig instance
+
+    Returns:
+        Dictionary with:
+        - 'results': DataFrame with sensitivity results
+        - 'config': Configuration used
+        - 'output_dir': Output directory
+        - 'saved_files': List of saved file paths
+
+    Example:
+        >>> import decline_curve as dca
+        >>> # Using config file
+        >>> results = dca.run_sensitivity_analysis('sensitivity_config.toml')
+        >>> # Using dict
+        >>> config_dict = {'param_grid': [...], 'prices': [70, 80], ...}
+        >>> results = dca.run_sensitivity_analysis(config_dict)
+    """
+    from .config import SensitivityConfig
+
+    # Load configuration
+    if isinstance(config_path, SensitivityConfig):
+        config = config_path
+    elif isinstance(config_path, (str, Path)):
+        config = SensitivityConfig.from_file(config_path)
+    elif isinstance(config_path, dict):
+        config = SensitivityConfig.from_dict(config_path)
+    else:
+        raise ValueError(
+            "config_path must be a file path (str/Path), dict, or SensitivityConfig"
+        )
+
+    # Configure logging
+    configure_logging(
+        level=getattr(__import__("logging"), config.log_level), log_file=config.log_file
+    )
+    logger.info(
+        f"Running sensitivity analysis from config: "
+        f"{config_path if isinstance(config_path, (str, Path)) else 'dict'}"
+    )
+
+    # Run sensitivity analysis using direct parameters from config
+    # (call internal function to avoid recursion)
+    results_df = _run_sensitivity(
+        config.param_grid,
+        config.prices,
+        config.opex,
+        config.discount_rate,
+        config.t_max,
+        config.econ_limit,
+        config.dt,
+    )
+
+    # Save outputs
+    output_dir = Path(config.output.output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    saved_files = []
+
+    if config.output.save_parameters:
+        output_path = output_dir / f"sensitivity_results.{config.output.format}"
+        if config.output.format == "csv":
+            results_df.to_csv(output_path, index=False)
+        elif config.output.format == "parquet":
+            results_df.to_parquet(output_path, index=False)
+        saved_files.append(str(output_path))
+        logger.info(f"Saved sensitivity results to {output_path}")
+
+    logger.info(f"Sensitivity analysis complete: {len(results_df)} combinations tested")
+
+    return {
+        "results": results_df,
+        "config": config,
+        "output_dir": str(output_dir),
+        "saved_files": saved_files,
+    }
