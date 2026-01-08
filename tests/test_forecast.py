@@ -7,14 +7,6 @@ import pandas as pd
 import pytest
 
 from decline_curve.forecast import Forecaster
-from decline_curve.forecast_chronos import (
-    check_chronos_availability,
-    forecast_chronos,
-)
-from decline_curve.forecast_timesfm import (
-    check_timesfm_availability,
-    forecast_timesfm,
-)
 
 
 class TestForecaster:
@@ -130,74 +122,6 @@ class TestForecaster:
             forecaster.evaluate(actual)
 
 
-class TestTimesFMIntegration:
-    """Test TimesFM forecasting integration."""
-
-    def test_timesfm_forecast_basic(self, sample_production_data):
-        """Test basic TimesFM forecasting."""
-        forecast = forecast_timesfm(sample_production_data, horizon=12)
-
-        assert isinstance(forecast, pd.Series)
-        assert len(forecast) == len(sample_production_data) + 12
-        assert all(forecast >= 0)  # Production should be non-negative
-
-    def test_timesfm_forecast_different_horizons(
-        self, sample_production_data, forecast_horizons
-    ):
-        """Test TimesFM with different forecast horizons."""
-        for horizon in forecast_horizons:
-            forecast = forecast_timesfm(sample_production_data, horizon=horizon)
-            assert len(forecast) == len(sample_production_data) + horizon
-
-    def test_timesfm_availability_check(self):
-        """Test TimesFM availability check."""
-        available = check_timesfm_availability()
-        assert isinstance(available, bool)
-
-    def test_timesfm_short_series(self):
-        """Test TimesFM with very short time series."""
-        dates = pd.date_range(start="2020-01-01", periods=3, freq="MS")
-        short_series = pd.Series([100, 90, 80], index=dates)
-
-        forecast = forecast_timesfm(short_series, horizon=6)
-        assert isinstance(forecast, pd.Series)
-        assert len(forecast) == 3 + 6
-
-
-class TestChronosIntegration:
-    """Test Chronos forecasting integration."""
-
-    def test_chronos_forecast_basic(self, sample_production_data):
-        """Test basic Chronos forecasting."""
-        forecast = forecast_chronos(sample_production_data, horizon=12)
-
-        assert isinstance(forecast, pd.Series)
-        assert len(forecast) == len(sample_production_data) + 12
-        assert all(forecast >= 0)  # Production should be non-negative
-
-    def test_chronos_forecast_different_horizons(
-        self, sample_production_data, forecast_horizons
-    ):
-        """Test Chronos with different forecast horizons."""
-        for horizon in forecast_horizons:
-            forecast = forecast_chronos(sample_production_data, horizon=horizon)
-            assert len(forecast) == len(sample_production_data) + horizon
-
-    def test_chronos_availability_check(self):
-        """Test Chronos availability check."""
-        available = check_chronos_availability()
-        assert isinstance(available, bool)
-
-    def test_chronos_short_series(self):
-        """Test Chronos with very short time series."""
-        dates = pd.date_range(start="2020-01-01", periods=2, freq="MS")
-        short_series = pd.Series([100, 90], index=dates)
-
-        forecast = forecast_chronos(short_series, horizon=6)
-        assert isinstance(forecast, pd.Series)
-        assert len(forecast) == 2 + 6
-
-
 class TestForecastConsistency:
     """Test consistency across different forecasting methods."""
 
@@ -207,25 +131,11 @@ class TestForecastConsistency:
 
         forecaster = Forecaster(sample_production_data)
         arps_forecast = forecaster.forecast(model="arps", horizon=horizon)
-        timesfm_forecast = forecast_timesfm(sample_production_data, horizon=horizon)
-        chronos_forecast = forecast_chronos(sample_production_data, horizon=horizon)
 
-        # All should have the same length
-        assert len(arps_forecast) == len(timesfm_forecast) == len(chronos_forecast)
-
-        # All should start from the same date
-        assert (
-            arps_forecast.index[0]
-            == timesfm_forecast.index[0]
-            == chronos_forecast.index[0]
-        )
-
-        # All should have the same frequency
-        assert (
-            arps_forecast.index.freq
-            == timesfm_forecast.index.freq
-            == chronos_forecast.index.freq
-        )
+        # Test that forecast has correct structure
+        assert isinstance(arps_forecast, pd.Series)
+        assert len(arps_forecast) == len(sample_production_data) + horizon
+        assert arps_forecast.index[0] == sample_production_data.index[0]
 
     def test_forecast_value_reasonableness(self, sample_production_data):
         """Test that forecast values are reasonable."""

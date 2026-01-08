@@ -3,6 +3,14 @@
 from typing import Literal, Optional, cast
 
 import matplotlib.pyplot as plt
+
+# Try to import signalplot
+try:
+    import signalplot
+
+    SIGNALPLOT_AVAILABLE = True
+except ImportError:
+    SIGNALPLOT_AVAILABLE = False
 import numpy as np
 import pandas as pd
 
@@ -16,7 +24,7 @@ from .forecast_statistical import (
 )
 from .forecast_timesfm import forecast_timesfm
 from .models import fit_arps, predict_arps
-from .plot import _range_markers, tufte_style
+from .plot import _range_markers, minimal_style
 
 try:
     from .forecast_arima import forecast_arima
@@ -197,19 +205,38 @@ class Forecaster:
         """
         if self.last_forecast is None:
             raise RuntimeError("Call .forecast() first.")
-        tufte_style()
+
+        # Apply signalplot style if available
+        if SIGNALPLOT_AVAILABLE:
+            signalplot.apply()
+        else:
+            minimal_style()
+
         fig, ax = plt.subplots()
         hist = self.series
         fcst = self.last_forecast
 
-        ax.plot(hist.index, hist.values, lw=1.0, label="history")
-        ax.plot(fcst.index, fcst.values, lw=1.2, label="forecast")
+        # Use signalplot colors if available
+        if SIGNALPLOT_AVAILABLE:
+            primary_color = "black"
+            accent_color = (
+                signalplot.ACCENT if hasattr(signalplot, "ACCENT") else "#C73E1D"
+            )
+        else:
+            primary_color = "#2E86AB"
+            accent_color = "#F18F01"
+
+        ax.plot(hist.index, hist.values, lw=1.0, label="history", color=primary_color)
+        ax.plot(fcst.index, fcst.values, lw=1.2, label="forecast", color=accent_color)
 
         _range_markers(ax, hist.values)
         ax.set_xlabel("Date")
         ax.set_ylabel("Production")
         ax.set_title(title)
-        ax.legend()
+        ax.legend(frameon=False)
         if filename:
-            plt.savefig(filename, bbox_inches="tight")
+            if SIGNALPLOT_AVAILABLE and hasattr(signalplot, "save"):
+                signalplot.save(filename)
+            else:
+                plt.savefig(filename, bbox_inches="tight", dpi=300, facecolor="white")
         plt.show()

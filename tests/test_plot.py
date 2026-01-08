@@ -11,20 +11,20 @@ import pandas as pd  # noqa: E402
 
 from decline_curve.plot import (  # noqa: E402
     _range_markers,
+    minimal_style,
     plot_benchmark_results,
     plot_decline_curve,
     plot_forecast,
-    tufte_style,
 )
 
 
 class TestPlottingUtilities:
     """Test plotting utility functions."""
 
-    def test_tufte_style(self):
-        """Test that Tufte style applies without errors."""
+    def test_minimal_style(self):
+        """Test that minimal style applies without errors."""
         # Should not raise any exceptions
-        tufte_style()
+        minimal_style()
 
         # Check that some key style parameters are set
         assert plt.rcParams["axes.spines.top"] is False
@@ -264,7 +264,7 @@ class TestPlottingConfiguration:
 
         try:
             matplotlib.use("Agg")
-            tufte_style()
+            minimal_style()
 
             # Create a simple plot
             fig, ax = plt.subplots()

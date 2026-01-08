@@ -62,6 +62,20 @@ Documentation
 
 .. toctree::
    :maxdepth: 2
+   :caption: Workflows:
+
+   workflows/single_well_workflow
+   workflows/field_analysis
+   workflows/state_scale_workflow
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Cookbook:
+
+   cookbook/index
+
+.. toctree::
+   :maxdepth: 2
    :caption: API Reference:
 
    api/multiphase

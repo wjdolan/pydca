@@ -416,13 +416,38 @@ def plot_monte_carlo_results(
     import matplotlib.pyplot as plt
     from matplotlib.gridspec import GridSpec
 
+    # Try to import signalplot
+    try:
+        import signalplot
+
+        SIGNALPLOT_AVAILABLE = True
+    except ImportError:
+        SIGNALPLOT_AVAILABLE = False
+
+    # Apply minimal style
+    from .plot import minimal_style
+
+    minimal_style()
+
+    # Get signalplot colors if available
+    if SIGNALPLOT_AVAILABLE:
+        primary_color = "black"
+        secondary_color = "#666666"
+        accent_color = signalplot.ACCENT if hasattr(signalplot, "ACCENT") else "#C73E1D"
+        fill_alpha = 0.15
+    else:
+        primary_color = "#2E86AB"
+        secondary_color = "#6A994E"
+        accent_color = "#C73E1D"
+        fill_alpha = 0.2
+
     # Create time array if not provided
     if t is None:
         t = np.arange(len(results.p50_forecast))
 
     # Create figure with subplots
     fig = plt.figure(figsize=(14, 10))
-    gs = GridSpec(3, 2, figure=fig, hspace=0.3, wspace=0.3)
+    gs = GridSpec(3, 2, figure=fig, hspace=0.35, wspace=0.3)
 
     # 1. Fan chart for production forecast
     ax1 = fig.add_subplot(gs[0, :])
@@ -430,98 +455,125 @@ def plot_monte_carlo_results(
         t,
         results.p90_forecast,
         results.p10_forecast,
-        alpha=0.3,
-        color="blue",
+        alpha=fill_alpha,
+        color=primary_color,
         label="P10-P90 range",
     )
-    ax1.plot(t, results.p50_forecast, "b-", linewidth=2, label="P50 (median)")
+    ax1.plot(t, results.p50_forecast, color=primary_color, linewidth=1.5, label="P50")
     ax1.plot(
-        t, results.p10_forecast, "g--", linewidth=1, alpha=0.7, label="P10 (optimistic)"
+        t,
+        results.p10_forecast,
+        color=secondary_color,
+        linewidth=1.2,
+        linestyle="--",
+        alpha=0.8,
+        label="P10",
     )
     ax1.plot(
         t,
         results.p90_forecast,
-        "r--",
-        linewidth=1,
-        alpha=0.7,
-        label="P90 (conservative)",
+        color=accent_color,
+        linewidth=1.2,
+        linestyle="--",
+        alpha=0.8,
+        label="P90",
     )
     ax1.set_xlabel("Time (months)")
     ax1.set_ylabel("Production Rate")
-    ax1.set_title(f"{title} - Fan Chart")
-    ax1.legend()
-    ax1.grid(True, alpha=0.3)
+    ax1.set_title("Fan Chart", fontsize=10)
+    ax1.legend(frameon=False)
 
     # 2. EUR distribution
     ax2 = fig.add_subplot(gs[1, 0])
-    ax2.hist(results.eur_samples, bins=50, alpha=0.7, color="blue", edgecolor="black")
+    ax2.hist(
+        results.eur_samples,
+        bins=50,
+        alpha=0.6,
+        color=primary_color,
+        edgecolor="white",
+        linewidth=0.5,
+    )
     ax2.axvline(
         results.p90_eur,
-        color="r",
+        color=accent_color,
         linestyle="--",
-        linewidth=2,
+        linewidth=1.2,
         label=f"P90: {results.p90_eur:,.0f}",
     )
     ax2.axvline(
         results.p50_eur,
-        color="g",
+        color=primary_color,
         linestyle="-",
-        linewidth=2,
+        linewidth=1.5,
         label=f"P50: {results.p50_eur:,.0f}",
     )
     ax2.axvline(
         results.p10_eur,
-        color="b",
+        color=secondary_color,
         linestyle="--",
-        linewidth=2,
+        linewidth=1.2,
         label=f"P10: {results.p10_eur:,.0f}",
     )
     ax2.set_xlabel("EUR (bbl or mcf)")
     ax2.set_ylabel("Frequency")
-    ax2.set_title("EUR Distribution")
-    ax2.legend()
-    ax2.grid(True, alpha=0.3)
+    ax2.set_title("EUR Distribution", fontsize=10)
+    ax2.legend(frameon=False)
 
     # 3. NPV distribution
     ax3 = fig.add_subplot(gs[1, 1])
-    ax3.hist(results.npv_samples, bins=50, alpha=0.7, color="green", edgecolor="black")
+    ax3.hist(
+        results.npv_samples,
+        bins=50,
+        alpha=0.6,
+        color=secondary_color,
+        edgecolor="white",
+        linewidth=0.5,
+    )
     ax3.axvline(
         results.p90_npv,
-        color="r",
+        color=accent_color,
         linestyle="--",
-        linewidth=2,
+        linewidth=1.2,
         label=f"P90: ${results.p90_npv:,.0f}",
     )
     ax3.axvline(
         results.p50_npv,
-        color="g",
+        color=primary_color,
         linestyle="-",
-        linewidth=2,
+        linewidth=1.5,
         label=f"P50: ${results.p50_npv:,.0f}",
     )
     ax3.axvline(
         results.p10_npv,
-        color="b",
+        color=secondary_color,
         linestyle="--",
-        linewidth=2,
+        linewidth=1.2,
         label=f"P10: ${results.p10_npv:,.0f}",
     )
     ax3.set_xlabel("NPV ($)")
     ax3.set_ylabel("Frequency")
-    ax3.set_title("NPV Distribution")
-    ax3.legend()
-    ax3.grid(True, alpha=0.3)
+    ax3.set_title("NPV Distribution", fontsize=10)
+    ax3.legend(frameon=False)
 
     # 4. Parameter correlation heatmap
     ax4 = fig.add_subplot(gs[2, 0])
     corr_matrix = results.parameters.corr()
-    im = ax4.imshow(corr_matrix, cmap="RdBu_r", vmin=-1, vmax=1, aspect="auto")
+    im = ax4.imshow(
+        corr_matrix,
+        cmap="RdBu_r",
+        vmin=-1,
+        vmax=1,
+        aspect="auto",
+        interpolation="nearest",
+    )
     ax4.set_xticks(range(len(corr_matrix.columns)))
     ax4.set_yticks(range(len(corr_matrix.columns)))
-    ax4.set_xticklabels(corr_matrix.columns, rotation=45)
-    ax4.set_yticklabels(corr_matrix.columns)
-    plt.colorbar(im, ax=ax4, label="Correlation")
-    ax4.set_title("Parameter Correlations")
+    ax4.set_xticklabels(corr_matrix.columns, rotation=45, ha="right", fontsize=8)
+    ax4.set_yticklabels(corr_matrix.columns, fontsize=8)
+    cbar = plt.colorbar(im, ax=ax4)
+    cbar.set_label("Correlation", fontsize=8)
+    cbar.ax.tick_params(labelsize=7)
+    ax4.set_title("Parameter Correlations", fontsize=10)
 
     # 5. Risk metrics table
     ax5 = fig.add_subplot(gs[2, 1])
@@ -553,20 +605,33 @@ def plot_monte_carlo_results(
         colWidths=[0.15, 0.15, 0.15, 0.15, 0.15],
     )
     table.auto_set_font_size(False)
-    table.set_fontsize(10)
+    table.set_fontsize(9)
     table.scale(1, 2)
 
-    # Style header row
+    # Style header row with minimal design
+    header_color = primary_color if SIGNALPLOT_AVAILABLE else "#2E86AB"
+    edge_color = "#E0E0E0" if SIGNALPLOT_AVAILABLE else "#CCCCCC"
+
     for i in range(5):
-        table[(0, i)].set_facecolor("#40466e")
-        table[(0, i)].set_text_props(weight="bold", color="white")
+        table[(0, i)].set_facecolor(header_color)
+        table[(0, i)].set_text_props(weight="bold", color="white", fontsize=9)
+        table[(0, i)].set_edgecolor(edge_color)
 
-    ax5.set_title("Risk Metrics Summary", pad=20)
+    # Style data rows
+    for i in range(1, 3):
+        for j in range(5):
+            table[(i, j)].set_edgecolor(edge_color)
+            table[(i, j)].set_linewidth(0.5)
 
-    plt.suptitle(title, fontsize=16, fontweight="bold", y=0.98)
+    ax5.set_title("Risk Metrics Summary", pad=20, fontsize=10)
+
+    plt.suptitle(title, fontsize=12, y=0.98)
 
     if filename:
-        plt.savefig(filename, bbox_inches="tight", dpi=300)
+        if SIGNALPLOT_AVAILABLE and hasattr(signalplot, "save"):
+            signalplot.save(filename)
+        else:
+            plt.savefig(filename, bbox_inches="tight", dpi=300, facecolor="white")
         logger.debug(f"Plot saved to {filename}")
 
     plt.show()

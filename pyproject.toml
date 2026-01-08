@@ -43,7 +43,6 @@ dependencies = [
   "pandas>=2.0",
   "scipy>=1.10",
   "matplotlib>=3.7",
-  "statsmodels>=0.14",
   "tqdm>=4.66",
   "numpy-financial>=1.0",
   "requests>=2.25",
@@ -53,6 +52,33 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# Statistical models (ARIMA, etc.)
+stats = [
+    "statsmodels>=0.14",
+]
+
+# Spatial analysis (kriging)
+spatial = [
+    "pykrige>=1.7.0",
+    "scikit-learn>=1.3",
+]
+
+# Integration with ecosystem libraries
+integrations = [
+    "pygeomodeling>=0.3.0",
+    "geosuite>=0.1.0",
+    "signalplot>=0.1.0",
+]
+
+# Large language models (Chronos, TimesFM)
+llm = [
+    "transformers>=4.41",
+    "torch>=2.0",
+    "accelerate>=0.29",
+    "einops>=0.7",
+]
+
+# Machine learning models (DeepAR, TFT, etc.)
 ml = [
     "transformers>=4.41",
     "torch>=2.0",
@@ -63,6 +89,17 @@ ml = [
 benchmark = [
     "mlflow>=2.0",
     "pyyaml>=6.0"
+]
+
+# Configuration file support
+config = [
+    "tomli>=2.0.0; python_version < '3.11'",
+    "pyyaml>=6.0",
+]
+
+# PDF report generation
+reports = [
+    "reportlab>=4.0.0",
 ]
 dev = [
   "pytest>=7.0",
@@ -87,7 +124,7 @@ examples = [
   "ipykernel>=6.0"
 ]
 all = [
-  "decline-curve[ml,dev,docs,examples]"
+  "decline-curve[stats,llm,ml,spatial,integrations,dev,docs,examples]"
 ]
 
 [project.urls]

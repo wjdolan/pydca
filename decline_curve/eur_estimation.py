@@ -184,3 +184,117 @@ def calculate_eur_batch(
         return pd.DataFrame()
 
     return pd.DataFrame(results)
+
+
+def calculate_eur_with_kriging(
+    df: pd.DataFrame,
+    well_id_col: str = "well_id",
+    date_col: str = "date",
+    value_col: str = "oil_bbl",
+    lon_col: str = "long",
+    lat_col: str = "lat",
+    model_type: str = "hyperbolic",
+    min_months: int = 6,
+    n_jobs: int = -1,
+    kriging_method: str = "auto",
+    min_wells_for_kriging: int = 10,
+) -> pd.DataFrame:
+    """
+    Calculate EUR for multiple wells and improve estimates using spatial kriging.
+
+    This function combines decline curve analysis with spatial kriging interpolation
+    to provide improved EUR estimates, especially for wells with limited data.
+
+    Args:
+        df: DataFrame with production data and well locations
+        well_id_col: Column name for well identifier
+        date_col: Column name for date
+        value_col: Column name for production value
+        lon_col: Column name for longitude
+        lat_col: Column name for latitude
+        model_type: Type of decline model
+        min_months: Minimum months of data required
+        n_jobs: Number of parallel jobs
+        kriging_method: Kriging method ('auto', 'ordinary', 'universal',
+            'gaussian_process')
+        min_wells_for_kriging: Minimum wells required for kriging
+        use_leave_one_out: If True, use leave-one-out cross-validation (more accurate
+            but slower). If False, use single-pass kriging (faster but may overfit).
+
+    Returns:
+        DataFrame with EUR results including:
+        - Original EUR estimates
+        - Kriged EUR estimates (eur_kriged)
+        - Kriging uncertainty (kriging_uncertainty)
+
+    Example:
+        >>> from decline_curve.eur_estimation import calculate_eur_with_kriging
+        >>> # df has columns: well_id, date, oil_bbl, long, lat
+        >>> results = calculate_eur_with_kriging(
+        ...     df,
+        ...     well_id_col='well_id',
+        ...     lon_col='long',
+        ...     lat_col='lat'
+        ... )
+        >>> print(f"Original EUR: {results['eur'].mean():.0f}")
+        >>> print(f"Kriged EUR: {results['eur_kriged'].mean():.0f}")
+    """
+    # First calculate EUR using standard method
+    eur_results = calculate_eur_batch(
+        df,
+        well_id_col=well_id_col,
+        date_col=date_col,
+        value_col=value_col,
+        model_type=model_type,
+        min_months=min_months,
+        n_jobs=n_jobs,
+    )
+
+    if len(eur_results) == 0:
+        logger.warning("No EUR calculations succeeded")
+        return pd.DataFrame()
+
+    # Add location information if available
+    if lon_col in df.columns and lat_col in df.columns:
+        # Get first location for each well
+        well_locations = (
+            df.groupby(well_id_col)[[lon_col, lat_col]].first().reset_index()
+        )
+        eur_results = eur_results.merge(well_locations, on=well_id_col, how="left")
+
+        # Improve with kriging if we have locations
+        if eur_results[lon_col].notna().sum() >= min_wells_for_kriging:
+            try:
+                from .spatial_kriging import improve_eur_with_kriging
+
+                eur_results = improve_eur_with_kriging(
+                    eur_results,
+                    well_id_col=well_id_col,
+                    lon_col=lon_col,
+                    lat_col=lat_col,
+                    eur_col="eur",
+                    min_wells_for_kriging=min_wells_for_kriging,
+                    kriging_method=kriging_method,
+                    use_leave_one_out=True,  # More accurate for validation
+                )
+                logger.info(
+                    f"Kriging interpolation applied to {len(eur_results)} wells"
+                )
+            except ImportError:
+                logger.warning(
+                    "Kriging libraries not available. Install with: "
+                    "pip install decline-curve[spatial]"
+                )
+            except Exception as e:
+                logger.warning(
+                    f"Kriging failed: {e}. Returning original EUR estimates."
+                )
+        else:
+            logger.info(
+                f"Insufficient wells with location data for kriging "
+                f"({eur_results[lon_col].notna().sum()} < {min_wells_for_kriging})"
+            )
+    else:
+        logger.info("Location columns not found. Skipping kriging interpolation.")
+
+    return eur_results

@@ -6,6 +6,35 @@ handles only one phase at a time.
 
 Based on research showing that coupled multi-target prediction yields more accurate
 and consistent forecasts than independent single-phase models.
+
+Multi-Phase Data Requirements:
+-----------------------------
+1. Required columns:
+   - Oil: REQUIRED (cannot be None or empty)
+   - Gas: OPTIONAL (can be None or missing)
+   - Water: OPTIONAL (can be None or missing)
+
+2. Units (expected, not enforced):
+   - Oil: bbl/month (barrels per month)
+   - Gas: mcf/month (thousand cubic feet per month)
+   - Water: bbl/month (barrels per month)
+
+3. Default handling for missing months:
+   - If a phase has missing months, the library will:
+     a) Forward-fill the last known value for up to 3 consecutive months
+     b) Use ratio-based forecasting (GOR for gas, water cut for water) if
+        historical data is insufficient
+     c) Raise a warning if more than 50% of months are missing
+
+4. Index requirements:
+   - All phases must share the same DatetimeIndex
+   - Index must have a regular frequency (MS = monthly start recommended)
+   - Missing months in the index are filled with NaN for that phase
+
+5. Data quality:
+   - Negative values are treated as missing (set to NaN)
+   - Zero values are valid (well may be shut-in)
+   - NaN values are handled according to missing month rules above
 """
 
 from dataclasses import dataclass
@@ -35,7 +64,12 @@ class MultiPhaseData:
     well_id: Optional[str] = None
 
     def __post_init__(self):
-        """Validate and align data."""
+        """Validate and align data according to multi-phase rules."""
+        # Oil is required
+        if self.oil is None or len(self.oil) == 0:
+            raise ValueError("Oil production data is required and cannot be empty")
+
+        # Set dates from oil index
         if self.dates is None:
             self.dates = self.oil.index
 
@@ -44,6 +78,38 @@ class MultiPhaseData:
             raise ValueError("Gas series index must match oil series index")
         if self.water is not None and not self.water.index.equals(self.dates):
             raise ValueError("Water series index must match oil series index")
+
+        # Handle missing months: forward-fill up to 3 consecutive months
+        self._handle_missing_months()
+
+    def _handle_missing_months(self):
+        """Handle missing months according to multi-phase rules."""
+        # Check for missing months in each phase
+        for phase_name in ["oil", "gas", "water"]:
+            phase_series = getattr(self, phase_name)
+            if phase_series is None:
+                continue
+
+            # Count missing values
+            missing_count = phase_series.isna().sum()
+            total_count = len(phase_series)
+
+            if missing_count > 0:
+                # Forward-fill up to 3 consecutive months
+                phase_series = phase_series.fillna(method="ffill", limit=3)
+
+                # Warn if more than 50% missing
+                if missing_count / total_count > 0.5:
+                    logger.warning(
+                        f"{phase_name.capitalize()} phase has {missing_count}/{total_count} "
+                        f"({missing_count/total_count*100:.1f}%) missing months. "
+                        "Forecast quality may be degraded."
+                    )
+
+                # Replace negative values with NaN (then forward-fill)
+                phase_series = phase_series.where(phase_series >= 0)
+
+                setattr(self, phase_name, phase_series)
 
     @property
     def phases(self) -> list[str]:

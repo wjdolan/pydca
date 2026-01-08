@@ -280,7 +280,8 @@ def compute_grade(
     Args:
         metrics: Dictionary of computed metrics
         quality_flags: Dictionary of quality check results
-        r_squared_thresholds: R² thresholds for A, B, C, D (default: 0.95, 0.85, 0.70, 0.50)
+        r_squared_thresholds: R² thresholds for A, B, C, D
+            (default: 0.95, 0.85, 0.70, 0.50)
         mape_thresholds: MAPE thresholds for A, B, C, D (default: 10%, 20%, 30%, 50%)
 
     Returns:

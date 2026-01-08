@@ -2,29 +2,30 @@
 
 This directory contains practical examples demonstrating the use of the Decline Curve Analysis package.
 
-## 📓 Jupyter Notebooks
+## Jupyter Notebooks
 
 1. **[01_basic_dca_analysis.ipynb](01_basic_dca_analysis.ipynb)** - Introduction to decline curve analysis with Arps models
 2. **[02_economic_evaluation.ipynb](02_economic_evaluation.ipynb)** - Economic analysis, NPV, and reserves estimation
-3. **[03_real_bakken_well_analysis.ipynb](03_real_bakken_well_analysis.ipynb)** - ⭐ Real Bakken shale well production analysis
-4. **[04_advanced_data_processing.ipynb](04_advanced_data_processing.ipynb)** - ⭐ Advanced data cleaning and ARIMA forecasting
-5. **[05_multiphase_forecasting.ipynb](05_multiphase_forecasting.ipynb)** - ⭐⭐ Multi-phase forecasting (oil + gas + water)
+3. **[03_real_bakken_well_analysis.ipynb](03_real_bakken_well_analysis.ipynb)** - Real Bakken shale well production analysis
+4. **[04_advanced_data_processing.ipynb](04_advanced_data_processing.ipynb)** - Advanced data cleaning and ARIMA forecasting
+5. **[05_multiphase_forecasting.ipynb](05_multiphase_forecasting.ipynb)** - Multi-phase forecasting (oil + gas + water)
 6. **[06_multi_well_benchmarking.ipynb](06_multi_well_benchmarking.ipynb)** - Comparing models across multiple wells (coming soon)
 7. **[07_ml_forecasting.ipynb](07_ml_forecasting.ipynb)** - Using ARIMA and foundation models for forecasting (coming soon)
+8. **[08_deepar_probabilistic_forecasting.ipynb](08_deepar_probabilistic_forecasting.ipynb)** - Probabilistic forecasting with DeepAR
 
-## 🚀 Python Scripts
+## Python Scripts
 
-- **[performance_benchmark.py](performance_benchmark.py)** - ⭐⭐ NEW! Comprehensive performance benchmarking
-- **[profiling_example.py](profiling_example.py)** - ⭐⭐ NEW! How to profile and optimize your code
-- **[monte_carlo_example.py](monte_carlo_example.py)** - ⭐⭐⭐ NEW! Probabilistic forecasting and uncertainty quantification
+- **[performance_benchmark.py](performance_benchmark.py)** - Comprehensive performance benchmarking
+- **[profiling_example.py](profiling_example.py)** - How to profile and optimize your code
+- **[monte_carlo_example.py](monte_carlo_example.py)** - Probabilistic forecasting and uncertainty quantification
 
-## 📊 Sample Data
+## Sample Data
 
 - **[sample_well_data.csv](data/sample_well_data.csv)** - Synthetic single well production history
 - **[field_production_data.csv](data/field_production_data.csv)** - Synthetic multi-well field data
-- **[bakken_well_production.csv](data/bakken_well_production.csv)** - ⭐ Real Bakken well production (NYSTUEN 14B-35HS)
+- **[bakken_well_production.csv](data/bakken_well_production.csv)** - Real Bakken well production (NYSTUEN 14B-35HS)
 
-## 🚀 Getting Started
+## Getting Started
 
 ### Install Jupyter
 
@@ -41,7 +42,7 @@ jupyter notebook
 
 Then open any `.ipynb` file in your browser.
 
-## 📝 Example Descriptions
+## Example Descriptions
 
 ### 01 - Basic DCA Analysis
 Learn the fundamentals:
@@ -87,7 +88,7 @@ Forecast oil, gas, and water simultaneously:
 - Compare forecasting approaches
 - Multi-phase economic analysis
 
-### 06 - Multi-Well Benchmarking (Coming Soon)
+### 06 - Multi-Well Benchmarking
 Analyze multiple wells:
 - Load field-level data
 - Benchmark different models
@@ -95,7 +96,7 @@ Analyze multiple wells:
 - Aggregate statistics
 - Batch processing workflows
 
-### 07 - ML Forecasting (Coming Soon)
+### 07 - ML Forecasting
 Advanced forecasting techniques:
 - ARIMA time series modeling
 - Foundation model integration (TimesFM, Chronos)
@@ -103,7 +104,8 @@ Advanced forecasting techniques:
 - Uncertainty quantification
 - Ensemble forecasting
 
-### Performance Benchmark Script ⭐⭐ NEW!
+### Performance Benchmark Script
+
 Measure and compare performance improvements:
 - Numba JIT compilation speedup (10-100x)
 - Joblib parallelization (4-8x on typical CPUs)
@@ -118,7 +120,8 @@ cd examples
 python performance_benchmark.py
 ```
 
-### Profiling Example Script ⭐⭐ NEW!
+### Profiling Example Script
+
 Learn how to profile and optimize your code:
 - Using @profile decorator for line-by-line profiling
 - Using profile_context() for timing blocks
@@ -133,7 +136,8 @@ cd examples
 python profiling_example.py
 ```
 
-### Monte Carlo Example Script ⭐⭐⭐ NEW!
+### Monte Carlo Example Script
+
 Probabilistic forecasting and uncertainty quantification:
 - Setting up parameter distributions (normal, lognormal, uniform, triangular)
 - Running Monte Carlo simulations
@@ -150,14 +154,14 @@ cd examples
 python monte_carlo_example.py
 ```
 
-## 💡 Tips
+## Tips
 
 - All notebooks use the sample data provided in the `data/` directory
 - Notebooks are self-contained and can be run independently
 - Modify parameters to experiment with different scenarios
 - Check the main documentation for detailed API reference
 
-## 🔗 Additional Resources
+## Additional Resources
 
 - [Full Documentation](https://decline-analysis.readthedocs.io/)
 - [API Reference](https://decline-analysis.readthedocs.io/api/dca.html)

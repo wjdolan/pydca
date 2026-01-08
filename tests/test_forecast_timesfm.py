@@ -4,10 +4,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from decline_curve.forecast_timesfm import (
-    check_timesfm_availability,
-    forecast_timesfm,
-)
+from decline_curve.forecast_timesfm import check_timesfm_availability, forecast_timesfm
 
 
 class TestTimesFMForecast:

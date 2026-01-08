@@ -2,7 +2,7 @@
 
 Thank you for your interest in contributing to the Decline Curve Analysis library! This guide will help you get started.
 
-## 🚀 Quick Start
+## Quick Start
 
 1. **Fork and Clone**
    ```bash
@@ -22,7 +22,7 @@ Thank you for your interest in contributing to the Decline Curve Analysis librar
    git checkout -b feature/your-feature-name
    ```
 
-## 🧪 Development Workflow
+## Development Workflow
 
 ### Running Tests
 
@@ -67,7 +67,7 @@ pip install pre-commit
 pre-commit install
 ```
 
-## 📝 Contribution Guidelines
+## Contribution Guidelines
 
 ### Code Style
 
@@ -134,7 +134,7 @@ def test_forecast_with_valid_data():
   open _build/html/index.html
   ```
 
-## 🐛 Reporting Bugs
+## Reporting Bugs
 
 When reporting bugs, please include:
 
@@ -170,7 +170,7 @@ What you expected to happen.
 Any other relevant information.
 ```
 
-## ✨ Feature Requests
+## Feature Requests
 
 We welcome feature requests! Please include:
 
@@ -179,7 +179,7 @@ We welcome feature requests! Please include:
 3. **Alternatives**: Other solutions you've considered
 4. **Examples**: Code examples of how it would be used
 
-## 🔄 Pull Request Process
+## Pull Request Process
 
 1. **Update Tests**: Ensure all tests pass and add new tests for your changes
 2. **Update Documentation**: Add docstrings and update relevant docs
@@ -215,7 +215,7 @@ Examples:
 - `fix(models): correct hyperbolic decline calculation`
 - `docs(readme): update installation instructions`
 
-## 🎯 Areas for Contribution
+## Areas for Contribution
 
 We especially welcome contributions in these areas:
 
@@ -237,20 +237,20 @@ We especially welcome contributions in these areas:
 - **Blog posts** (case studies)
 - **API documentation** (improve existing docs)
 
-## 💬 Getting Help
+## Getting Help
 
 - **Documentation**: [https://decline-analysis.readthedocs.io/](https://decline-analysis.readthedocs.io/)
 - **GitHub Issues**: [https://github.com/yourusername/decline-curve/issues](https://github.com/yourusername/decline-curve/issues)
 - **Discussions**: [https://github.com/yourusername/decline-curve/discussions](https://github.com/yourusername/decline-curve/discussions)
 
-## 📜 Code of Conduct
+## Code of Conduct
 
 This project follows the [Contributor Covenant Code of Conduct](CODE_OF_CONDUCT.md). By participating, you are expected to uphold this code.
 
-## 📄 License
+## License
 
 By contributing, you agree that your contributions will be licensed under the Apache License 2.0.
 
 ---
 
-**Thank you for contributing to Decline Curve Analysis! 🎉**
+Thank you for contributing to Decline Curve Analysis!

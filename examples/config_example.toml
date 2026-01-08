@@ -1,0 +1,50 @@
+# Example configuration file for decline curve analysis batch job
+
+[data]
+path = "data/production.csv"
+format = "csv"
+well_id_col = "well_id"
+date_col = "date"
+value_col = "oil_bbl"
+filters = { min_months = 6 }
+
+[model]
+model = "arps"
+kind = "hyperbolic"
+horizon = 12
+params = {}
+
+[economics]
+price = 70.0
+opex = 15.0
+fixed_opex = 5000.0
+discount_rate = 0.10
+
+[[economics.scenarios]]
+name = "low"
+price = 50.0
+opex = 15.0
+
+[[economics.scenarios]]
+name = "base"
+price = 70.0
+opex = 15.0
+
+[[economics.scenarios]]
+name = "high"
+price = 90.0
+opex = 15.0
+
+[output]
+output_dir = "output"
+save_forecasts = true
+save_parameters = true
+save_plots = false
+save_reports = false
+format = "csv"
+
+n_jobs = -1
+chunk_size = 100
+max_retries = 2
+log_level = "INFO"
+log_file = "batch_job.log"

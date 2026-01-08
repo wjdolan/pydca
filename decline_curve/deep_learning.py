@@ -502,7 +502,8 @@ class EncoderDecoderLSTMForecaster:
 
             if verbose and (epoch + 1) % 10 == 0:
                 logger.info(
-                    f"Epoch {epoch+1}/{epochs} - Loss: {train_loss:.4f}, Val Loss: {val_loss:.4f}"
+                    f"Epoch {epoch+1}/{epochs} - Loss: {train_loss:.4f}, "
+                    f"Val Loss: {val_loss:.4f}"
                 )
 
         self.is_fitted = True
@@ -713,7 +714,8 @@ class EncoderDecoderLSTMForecaster:
         Normalize sequences using the scaler.
 
         Args:
-            sequences: Array of shape (n_samples, seq_len, n_features) or (seq_len, n_features)
+            sequences: Array of shape (n_samples, seq_len, n_features) or
+                (seq_len, n_features)
             fit: Whether to fit the scaler
 
         Returns:
@@ -1095,7 +1097,7 @@ class EncoderDecoderLSTMForecaster:
 
 if not TORCH_AVAILABLE:
     # Fallback when PyTorch is not available
-    class EncoderDecoderLSTMForecaster:
+    class EncoderDecoderLSTMForecaster:  # noqa: F811
         """Placeholder when PyTorch is not available."""
 
         def __init__(self, *args, **kwargs):

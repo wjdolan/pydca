@@ -397,9 +397,6 @@ class CurveFitFitter(Fitter):
         fixed_mask = np.array([p in (fit_spec.fixed_params or {}) for p in param_names])
         if fixed_mask.any():
             # Remove fixed parameters
-            free_param_names = [
-                p for i, p in enumerate(param_names) if not fixed_mask[i]
-            ]
             free_p0 = [p0[i] for i in range(len(param_names)) if not fixed_mask[i]]
             free_bounds_lower = [
                 bounds[0][i] for i in range(len(param_names)) if not fixed_mask[i]
@@ -422,7 +419,6 @@ class CurveFitFitter(Fitter):
                 return fit_spec.model.rate(t_arr, all_params)
 
         else:
-            free_param_names = param_names
             free_p0 = p0
             free_bounds = bounds
 
@@ -503,6 +499,7 @@ class RobustLeastSquaresFitter(Fitter):
 
     @property
     def name(self) -> str:
+        """Return the name of the fitter."""
         return "robust_least_squares"
 
     def fit(
@@ -554,9 +551,6 @@ class RobustLeastSquaresFitter(Fitter):
         # Handle fixed parameters
         fixed_mask = np.array([p in (fit_spec.fixed_params or {}) for p in param_names])
         if fixed_mask.any():
-            free_param_names = [
-                p for i, p in enumerate(param_names) if not fixed_mask[i]
-            ]
             free_p0 = p0[~fixed_mask]
             free_bounds_lower = bounds_lower[~fixed_mask]
             free_bounds_upper = bounds_upper[~fixed_mask]
@@ -575,7 +569,6 @@ class RobustLeastSquaresFitter(Fitter):
                 return residuals
 
         else:
-            free_param_names = param_names
             free_p0 = p0
             free_bounds_lower = bounds_lower
             free_bounds_upper = bounds_upper

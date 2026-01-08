@@ -286,10 +286,10 @@ mc_params.n_simulations = 500    # Faster, less precise
 
 ```python
 # Too wide (unrealistic)
-qi_dist = DistributionParams('uniform', min=500, max=5000)  # ❌
+qi_dist = DistributionParams('uniform', min=500, max=5000)  # Not recommended
 
 # Reasonable (±20-30% from mean)
-qi_dist = DistributionParams('lognormal', mean=1200, std=0.25)  # ✓
+qi_dist = DistributionParams('lognormal', mean=1200, std=0.25)  # Recommended
 ```
 
 ### 3. Use Enough Simulations

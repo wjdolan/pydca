@@ -1,0 +1,56 @@
+# Example catalog entry for Pennsylvania production data
+# This demonstrates the catalog system for large datasets
+
+name: pennsylvania
+description: Pennsylvania production data from Department of Environmental Protection
+sources:
+  - name: pa_dep
+    type: file
+    path: data/pennsylvania/production.csv
+    format: csv
+    columns:
+      well_id: API_WELLNO
+      date: ReportDate
+      oil: Oil
+      gas: Gas
+      water: Wtr
+
+filters:
+  - column: date
+    operator: '>='
+    value: '2020-01-01'
+  - column: county
+    operator: in
+    value: ['Washington', 'Greene', 'Fayette']
+
+output_columns:
+  well_id: well_id
+  date: date
+  oil: oil
+  gas: gas
+  water: water
+
+---
+# Example catalog entry for New Mexico production data
+
+name: new_mexico
+description: New Mexico production data from Oil Conservation Division
+sources:
+  - name: nm_ocd
+    type: file
+    path: data/new_mexico/production.parquet
+    format: parquet
+
+filters:
+  - column: date
+    operator: '>='
+    value: '2018-01-01'
+  - column: status
+    operator: '=='
+    value: 'producing'
+
+output_columns:
+  well_id: API_WELLNO
+  date: ReportDate
+  oil: Oil
+  gas: Gas

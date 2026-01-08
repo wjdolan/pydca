@@ -1,5 +1,7 @@
 """
-Plotting utilities for decline curve analysis with Tufte-style aesthetics.
+Plotting utilities for decline curve analysis with minimal production-ready aesthetics.
+
+Uses signalplot for consistent minimalist styling based on Tufte's principles.
 """
 
 from typing import TYPE_CHECKING, Mapping, Optional, Union
@@ -9,50 +11,77 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
+from .logging_config import get_logger
+
+logger = get_logger(__name__)
+
 if TYPE_CHECKING:
     from .models import ArpsParams
 
+# Try to import signalplot
+try:
+    import signalplot
 
-def tufte_style():
-    """Apply Tufte-inspired minimalist styling to matplotlib plots."""
-    plt.style.use("default")
-    plt.rcParams.update(
-        {
-            "axes.linewidth": 0.5,
-            "axes.spines.left": True,
-            "axes.spines.bottom": True,
-            "axes.spines.top": False,
-            "axes.spines.right": False,
-            "xtick.bottom": True,
-            "xtick.top": False,
-            "ytick.left": True,
-            "ytick.right": False,
-            "axes.grid": True,
-            "grid.linewidth": 0.3,
-            "grid.alpha": 0.7,
-            "font.size": 10,
-            "axes.labelsize": 11,
-            "axes.titlesize": 12,
-            "legend.fontsize": 9,
-            "figure.figsize": (10, 6),
-            "figure.dpi": 100,
-        }
+    SIGNALPLOT_AVAILABLE = True
+except ImportError:
+    SIGNALPLOT_AVAILABLE = False
+    logger.debug(
+        "signalplot not available. Install with: pip install signalplot. "
+        "Falling back to basic matplotlib styling."
     )
 
 
+def minimal_style():
+    """Apply minimalist production-ready styling to matplotlib plots.
+
+    Uses signalplot if available, otherwise falls back to basic styling.
+    Clean, professional aesthetics suitable for reports and presentations.
+    Based on Tufte's principles of data-ink ratio and visual clarity.
+    """
+    if SIGNALPLOT_AVAILABLE:
+        signalplot.apply()
+    else:
+        # Fallback to basic minimalist styling
+        plt.style.use("default")
+        plt.rcParams.update(
+            {
+                # Minimal frame
+                "axes.linewidth": 0.5,
+                "axes.spines.left": True,
+                "axes.spines.bottom": True,
+                "axes.spines.top": False,
+                "axes.spines.right": False,
+                # Clean ticks
+                "xtick.bottom": True,
+                "xtick.top": False,
+                "ytick.left": True,
+                "ytick.right": False,
+                "xtick.direction": "out",
+                "ytick.direction": "out",
+                # Subtle grid
+                "axes.grid": True,
+                "grid.linewidth": 0.3,
+                "grid.alpha": 0.5,
+                "grid.color": "#E0E0E0",
+                # Typography
+                "font.size": 9,
+                "axes.labelsize": 10,
+                "axes.titlesize": 11,
+                "legend.fontsize": 8,
+                "legend.frameon": False,
+                # Figure
+                "figure.figsize": (10, 6),
+                "figure.dpi": 100,
+                "figure.facecolor": "white",
+                "axes.facecolor": "white",
+            }
+        )
+
+
 def _range_markers(ax, values: np.ndarray):
-    """Add subtle range markers to indicate data spread."""
-    if len(values) == 0:
-        return
-
-    y_min, y_max = np.min(values), np.max(values)
-    y_range = y_max - y_min
-
-    if y_range > 0:
-        # Add subtle horizontal lines at quartiles
-        q25, q75 = np.percentile(values, [25, 75])
-        ax.axhline(q25, color="gray", alpha=0.3, linewidth=0.5, linestyle="--")
-        ax.axhline(q75, color="gray", alpha=0.3, linewidth=0.5, linestyle="--")
+    """Add subtle range markers to indicate data spread (optional)."""
+    # Removed for cleaner production plots
+    pass
 
 
 def plot_forecast(
@@ -72,7 +101,7 @@ def plot_forecast(
     - filename: Optional filename to save plot
     - show_metrics: Whether to display evaluation metrics
     """
-    tufte_style()
+    minimal_style()
     fig, ax = plt.subplots(figsize=(12, 7))
 
     # Split historical and forecast data
@@ -80,16 +109,26 @@ def plot_forecast(
     hist_data = y_pred[y_pred.index <= hist_end]
     forecast_data = y_pred[y_pred.index > hist_end]
 
+    # Use signalplot colors if available, otherwise use dark gray/black
+    if SIGNALPLOT_AVAILABLE:
+        primary_color = "black"
+        secondary_color = "#666666"  # Medium gray
+        accent_color = signalplot.ACCENT if hasattr(signalplot, "ACCENT") else "#C73E1D"
+    else:
+        primary_color = "#2E86AB"
+        secondary_color = "#666666"
+        accent_color = "#C73E1D"
+
     # Plot historical data
     ax.plot(
         y_true.index,
         y_true.values,
         "o-",
-        color="#2E86AB",
-        linewidth=2,
-        markersize=4,
+        color=primary_color,
+        linewidth=1.5,
+        markersize=3,
         label="Historical",
-        alpha=0.8,
+        alpha=0.9,
     )
 
     # Plot fitted curve on historical period
@@ -98,8 +137,8 @@ def plot_forecast(
             hist_data.index,
             hist_data.values,
             "--",
-            color="#A23B72",
-            linewidth=2,
+            color=secondary_color,
+            linewidth=1.5,
             label="Fitted",
             alpha=0.7,
         )
@@ -110,19 +149,16 @@ def plot_forecast(
             forecast_data.index,
             forecast_data.values,
             "-",
-            color="#F18F01",
-            linewidth=2.5,
+            color=accent_color if SIGNALPLOT_AVAILABLE else primary_color,
+            linewidth=2,
             label="Forecast",
             alpha=0.9,
         )
 
-    # Add range markers
-    _range_markers(ax, y_true.values)
-
     # Formatting
-    ax.set_xlabel("Date", fontweight="bold")
-    ax.set_ylabel("Production Rate", fontweight="bold")
-    ax.set_title(title, fontweight="bold", pad=20)
+    ax.set_xlabel("Date")
+    ax.set_ylabel("Production Rate")
+    ax.set_title(title, pad=15)
 
     # Format x-axis dates
     if isinstance(y_true.index, pd.DatetimeIndex):
@@ -149,16 +185,26 @@ def plot_forecast(
                 metrics_text,
                 transform=ax.transAxes,
                 verticalalignment="top",
+                fontsize=8,
                 bbox=dict(
-                    boxstyle="round", facecolor="white", alpha=0.8, edgecolor="gray"
+                    boxstyle="square,pad=0.5",
+                    facecolor="white",
+                    alpha=0.9,
+                    edgecolor="#CCCCCC" if not SIGNALPLOT_AVAILABLE else "#E0E0E0",
+                    linewidth=0.5,
                 ),
             )
 
-    ax.legend(loc="upper right", frameon=True, fancybox=True, shadow=True)
+    ax.legend(loc="upper right", frameon=False)
     plt.tight_layout()
 
     if filename:
-        plt.savefig(filename, dpi=300, bbox_inches="tight")
+        # Use signalplot's save if available, otherwise standard save
+        if SIGNALPLOT_AVAILABLE and hasattr(signalplot, "save"):
+            signalplot.save(filename)
+        else:
+            plt.savefig(filename, dpi=300, bbox_inches="tight", facecolor="white")
+        logger.info(f"Plot saved to {filename}")
 
     plt.show()
 
@@ -183,29 +229,41 @@ def plot_decline_curve(
     """
     from .models import predict_arps
 
-    tufte_style()
+    minimal_style()
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 6))
+
+    # Use signalplot colors if available
+    if SIGNALPLOT_AVAILABLE:
+        primary_color = "black"
+        accent_color = signalplot.ACCENT if hasattr(signalplot, "ACCENT") else "#C73E1D"
+    else:
+        primary_color = "#2E86AB"
+        accent_color = "#F18F01"
 
     # Linear plot
     t_extended = np.linspace(0, max(t) * 2, 100)
     q_fit = predict_arps(t_extended, params)
 
-    ax1.plot(t, q, "o", color="#2E86AB", markersize=6, label="Data", alpha=0.7)
-    ax1.plot(t_extended, q_fit, "-", color="#F18F01", linewidth=2, label="Fitted")
+    ax1.plot(t, q, "o", color=primary_color, markersize=4, label="Data", alpha=0.8)
+    ax1.plot(t_extended, q_fit, "-", color=accent_color, linewidth=1.5, label="Fitted")
     ax1.set_xlabel("Time")
     ax1.set_ylabel("Production Rate")
     ax1.set_title("Linear Scale")
-    ax1.legend()
-    ax1.grid(True, alpha=0.3)
+    ax1.legend(frameon=False)
+    if not SIGNALPLOT_AVAILABLE:
+        ax1.grid(True, alpha=0.3)
 
     # Log plot
-    ax2.semilogy(t, q, "o", color="#2E86AB", markersize=6, label="Data", alpha=0.7)
-    ax2.semilogy(t_extended, q_fit, "-", color="#F18F01", linewidth=2, label="Fitted")
+    ax2.semilogy(t, q, "o", color=primary_color, markersize=4, label="Data", alpha=0.8)
+    ax2.semilogy(
+        t_extended, q_fit, "-", color=accent_color, linewidth=1.5, label="Fitted"
+    )
     ax2.set_xlabel("Time")
     ax2.set_ylabel("Production Rate (log scale)")
     ax2.set_title("Semi-log Scale")
-    ax2.legend()
-    ax2.grid(True, alpha=0.3)
+    ax2.legend(frameon=False)
+    if not SIGNALPLOT_AVAILABLE:
+        ax2.grid(True, alpha=0.3)
 
     # Add parameter text
     if isinstance(params, Mapping):
@@ -235,10 +293,17 @@ def plot_decline_curve(
         param_text,
         transform=ax1.transAxes,
         verticalalignment="top",
-        bbox=dict(boxstyle="round", facecolor="white", alpha=0.8, edgecolor="gray"),
+        fontsize=8,
+        bbox=dict(
+            boxstyle="square,pad=0.5",
+            facecolor="white",
+            alpha=0.9,
+            edgecolor="#E0E0E0" if SIGNALPLOT_AVAILABLE else "#CCCCCC",
+            linewidth=0.5,
+        ),
     )
 
-    plt.suptitle(title, fontweight="bold", y=1.02)
+    plt.suptitle(title, y=1.02)
     plt.tight_layout()
     plt.show()
 
@@ -256,17 +321,26 @@ def plot_benchmark_results(
     - metric: metric to plot ('rmse', 'mae', 'smape')
     - title: plot title
     """
-    tufte_style()
+    minimal_style()
     fig, ax = plt.subplots(figsize=(12, 6))
 
     if metric in results_df.columns:
         results_sorted = results_df.sort_values(metric)
+
+        # Use signalplot colors if available
+        if SIGNALPLOT_AVAILABLE:
+            bar_color = "black"
+            edge_color = "white"
+        else:
+            bar_color = "#2E86AB"
+            edge_color = "white"
+
         bars = ax.bar(
             range(len(results_sorted)),
             results_sorted[metric],
-            color="#2E86AB",
+            color=bar_color,
             alpha=0.7,
-            edgecolor="white",
+            edgecolor=edge_color,
             linewidth=0.5,
         )
 
@@ -289,26 +363,36 @@ def plot_benchmark_results(
         # Add summary statistics
         mean_val = results_sorted[metric].mean()
         median_val = results_sorted[metric].median()
+
+        # Use signalplot accent color if available
+        if SIGNALPLOT_AVAILABLE:
+            accent_color = (
+                signalplot.ACCENT if hasattr(signalplot, "ACCENT") else "#C73E1D"
+            )
+            secondary_color = "#666666"
+        else:
+            accent_color = "red"
+            secondary_color = "orange"
+
         ax.axhline(
             mean_val,
-            color="red",
+            color=accent_color,
             linestyle="--",
             alpha=0.7,
+            linewidth=1,
             label=f"Mean: {mean_val:.1f}",
         )
         ax.axhline(
             median_val,
-            color="orange",
+            color=secondary_color,
             linestyle="--",
             alpha=0.7,
+            linewidth=1,
             label=f"Median: {median_val:.1f}",
         )
 
-        ax.legend()
+        ax.legend(frameon=False)
         plt.tight_layout()
         plt.show()
     else:
-        from .logging_config import get_logger
-
-        logger = get_logger(__name__)
         logger.warning(f"Metric '{metric}' not found in results DataFrame")

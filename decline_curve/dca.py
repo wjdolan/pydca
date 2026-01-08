@@ -8,7 +8,7 @@ from .economics import economic_metrics
 from .evaluate import mae, rmse, smape
 from .forecast import Forecaster
 from .logging_config import get_logger
-from .models import ArpsParams
+from .models import ArpsParams, fit_arps, predict_arps
 from .plot import plot_forecast
 from .reserves import forecast_and_reserves
 from .sensitivity import run_sensitivity
@@ -455,3 +455,321 @@ def reserves(
         Dictionary with forecast, time arrays, and EUR
     """
     return forecast_and_reserves(params, t_max, dt, econ_limit)
+
+
+def single_well(
+    series: pd.Series,
+    model: Literal["arps", "arima", "timesfm", "chronos"] = "arps",
+    kind: Optional[Literal["exponential", "harmonic", "hyperbolic"]] = "hyperbolic",
+    horizon: int = 12,
+    return_params: bool = False,
+) -> pd.Series | tuple[pd.Series, dict]:
+    """
+    Analyze a single well with Arps decline curve.
+
+    This is the main entry point for single well analysis. It fits a decline
+    curve to historical production and generates a forecast.
+
+    Args:
+        series: Historical production time series with DatetimeIndex
+        model: Forecasting model ('arps', 'arima', 'timesfm', 'chronos')
+        kind: Arps decline type ('exponential', 'harmonic', 'hyperbolic')
+        horizon: Number of periods to forecast
+        return_params: If True, also return fitted parameters
+
+    Returns:
+        Forecasted production series. If return_params=True, returns tuple
+        (forecast, params_dict) where params_dict contains fitted parameters.
+
+    Example:
+        >>> import pandas as pd
+        >>> import decline_curve as dca
+        >>> dates = pd.date_range('2020-01-01', periods=24, freq='MS')
+        >>> production = pd.Series([1000, 950, 900, ...], index=dates)
+        >>> forecast = dca.single_well(production, model='arps', kind='hyperbolic')
+        >>> forecast, params = dca.single_well(production, return_params=True)
+    """
+    if not isinstance(series.index, pd.DatetimeIndex):
+        raise ValueError("Input series must have DatetimeIndex")
+
+    if model == "arps":
+        # Use Arps directly for cleaner API
+        import numpy as np
+
+        t = np.arange(len(series))
+        q = series.values
+        params = fit_arps(t, q, kind=kind or "hyperbolic")
+
+        # Generate forecast
+        full_t = np.arange(len(series) + horizon)
+        yhat = predict_arps(full_t, params)
+        idx = pd.date_range(
+            series.index[0], periods=len(yhat), freq=series.index.freq or "MS"
+        )
+        forecast_series = pd.Series(yhat, index=idx, name="forecast")
+
+        if return_params:
+            params_dict = {
+                "qi": params.qi,
+                "di": params.di,
+                "b": params.b,
+                "kind": kind or "hyperbolic",
+            }
+            return forecast_series, params_dict
+        return forecast_series
+    else:
+        # Use existing forecast function for other models
+        result = forecast(series, model=model, kind=kind, horizon=horizon)
+        if return_params:
+            # For non-Arps models, params may not be available
+            return result, {}
+        return result
+
+
+def batch_jobs(
+    df: pd.DataFrame,
+    well_col: str = "well_id",
+    date_col: str = "date",
+    value_col: str = "oil_bbl",
+    model: Literal["arps", "arima"] = "arps",
+    kind: Optional[Literal["exponential", "harmonic", "hyperbolic"]] = "hyperbolic",
+    horizon: int = 12,
+    n_jobs: int = -1,
+    verbose: bool = False,
+) -> pd.DataFrame:
+    """
+    Run batch decline curve analysis across multiple wells.
+
+    This is the main entry point for batch processing. It processes multiple
+    wells in parallel and returns a summary DataFrame with parameters and metrics.
+
+    Args:
+        df: DataFrame with production data for multiple wells
+        well_col: Column name for well identifier
+        date_col: Column name for dates
+        value_col: Column name for production values
+        model: Forecasting model ('arps' or 'arima')
+        kind: Arps decline type (if model='arps')
+        horizon: Forecast horizon in months
+        n_jobs: Number of parallel jobs (-1 for all cores, 1 for sequential)
+        verbose: Print progress messages
+
+    Returns:
+        DataFrame with one row per well containing:
+        - well_id
+        - qi, di, b (Arps parameters if model='arps')
+        - rmse, mae, smape (evaluation metrics)
+        - forecast (as Series in column, if applicable)
+
+    Example:
+        >>> import pandas as pd
+        >>> import decline_curve as dca
+        >>> # df has columns: well_id, date, oil_bbl
+        >>> results = dca.batch_jobs(df, well_col='well_id', model='arps')
+    """
+    if well_col not in df.columns:
+        raise ValueError(f"Column '{well_col}' not found in DataFrame")
+    if date_col not in df.columns:
+        raise ValueError(f"Column '{date_col}' not found in DataFrame")
+    if value_col not in df.columns:
+        raise ValueError(f"Column '{value_col}' not found in DataFrame")
+
+    wells = df[well_col].unique()
+    results = []
+
+    def process_well(well_id: str) -> dict | None:
+        """Process a single well."""
+        try:
+            well_df = df[df[well_col] == well_id].copy()
+            well_df = well_df[[date_col, value_col]].dropna()
+            well_df[date_col] = pd.to_datetime(well_df[date_col])
+            well_df = well_df.set_index(date_col).sort_index()
+
+            if len(well_df) < 6:  # Minimum data points
+                if verbose:
+                    logger.warning(
+                        f"Well {well_id}: insufficient data ({len(well_df)} points)"
+                    )
+                return None
+
+            # Ensure regular frequency
+            if well_df.index.freq is None:
+                well_df = well_df.asfreq("MS", method="ffill")
+
+            series = well_df[value_col]
+
+            # Fit and forecast
+            if model == "arps":
+                forecast_series, params = single_well(
+                    series, model="arps", kind=kind, horizon=horizon, return_params=True
+                )
+                # Calculate metrics on historical fit
+                hist_forecast = forecast_series[: len(series)]
+                metrics = evaluate(series, hist_forecast)
+                result = {
+                    well_col: well_id,
+                    "qi": params["qi"],
+                    "di": params["di"],
+                    "b": params["b"],
+                    **metrics,
+                }
+            else:
+                forecast_series = single_well(series, model=model, horizon=horizon)
+                hist_forecast = forecast_series[: len(series)]
+                metrics = evaluate(series, hist_forecast)
+                result = {well_col: well_id, **metrics}
+
+            return result
+        except Exception as e:
+            if verbose:
+                logger.warning(f"Well {well_id} failed: {str(e)}")
+            return {well_col: well_id, "error": str(e)}
+
+    # Process wells
+    if JOBLIB_AVAILABLE and n_jobs != 1:
+        if verbose:
+            logger.info(f"Processing {len(wells)} wells in parallel (n_jobs={n_jobs})")
+        from joblib import Parallel, delayed
+
+        results_list = Parallel(n_jobs=n_jobs, verbose=0)(
+            delayed(process_well)(wid) for wid in wells
+        )
+        results = [r for r in results_list if r is not None]
+    else:
+        if not JOBLIB_AVAILABLE and verbose:
+            logger.warning("joblib not available, running sequentially")
+        for well_id in wells:
+            result = process_well(well_id)
+            if result is not None:
+                results.append(result)
+            if verbose and len(results) % 10 == 0:
+                logger.info(f"Processed {len(results)}/{len(wells)} wells")
+
+    if verbose:
+        logger.info(
+            f"Batch processing complete: {len(results)}/{len(wells)} wells successful"
+        )
+
+    return pd.DataFrame(results)
+
+
+def type_curves(
+    df: pd.DataFrame,
+    grouping_col: Optional[str] = None,
+    date_col: str = "date",
+    value_col: str = "oil_bbl",
+    kind: Literal["exponential", "harmonic", "hyperbolic"] = "hyperbolic",
+    method: Literal["mean", "median", "p50"] = "median",
+    normalize: bool = True,
+) -> pd.Series:
+    """
+    Generate type curves for groups of similar wells.
+
+    A type curve is a representative decline curve for a group of wells with
+    similar characteristics. This function fits Arps curves to each well in
+    a group and returns an aggregated type curve.
+
+    Args:
+        df: DataFrame with production data
+        grouping_col: Column to group wells by (e.g., 'formation', 'county').
+            If None, all wells are treated as one group.
+        date_col: Column name for dates
+        value_col: Column name for production values
+        kind: Arps decline type
+        method: Aggregation method:
+            - 'mean': Average of fitted parameters
+            - 'median': Median of fitted parameters
+            - 'p50': Use P50 parameters from distribution
+        normalize: If True, normalize all wells to start at t=0 with q=qi.
+            If False, use actual time alignment.
+
+    Returns:
+        Type curve as a pandas Series with DatetimeIndex starting from first
+        production month. The curve represents the typical decline behavior
+        for the group.
+
+    Example:
+        >>> import pandas as pd
+        >>> import decline_curve as dca
+        >>> # df has columns: well_id, date, oil_bbl, formation
+        >>> type_curve = dca.type_curves(
+        ...     df, grouping_col='formation', kind='hyperbolic'
+        ... )
+    """
+    import numpy as np
+
+    if date_col not in df.columns:
+        raise ValueError(f"Column '{date_col}' not found in DataFrame")
+    if value_col not in df.columns:
+        raise ValueError(f"Column '{value_col}' not found in DataFrame")
+
+    # Group wells
+    if grouping_col is None:
+        groups = {"all": df}
+    else:
+        if grouping_col not in df.columns:
+            raise ValueError(f"Column '{grouping_col}' not found in DataFrame")
+        groups = {name: group_df for name, group_df in df.groupby(grouping_col)}
+
+    # For now, process first group (can be extended to return multiple curves)
+    group_name = list(groups.keys())[0]
+    group_df = groups[group_name]
+
+    # Extract well IDs (assuming there's a well_id column or using index)
+    well_col = (
+        "well_id" if "well_id" in group_df.columns else group_df.index.name or "well_id"
+    )
+
+    # Fit Arps to each well and collect parameters
+    params_list = []
+    for well_id, well_df in group_df.groupby(well_col):
+        try:
+            well_df = well_df[[date_col, value_col]].dropna().copy()
+            well_df[date_col] = pd.to_datetime(well_df[date_col])
+            well_df = well_df.set_index(date_col).sort_index()
+
+            if len(well_df) < 6:
+                continue
+
+            series = well_df[value_col]
+            t = np.arange(len(series))
+            q = series.values
+            params = fit_arps(t, q, kind=kind)
+            params_list.append((params.qi, params.di, params.b))
+        except Exception:
+            continue
+
+    if len(params_list) == 0:
+        raise ValueError("No wells could be fitted successfully")
+
+    # Aggregate parameters
+    qi_values = [p[0] for p in params_list]
+    di_values = [p[1] for p in params_list]
+    b_values = [p[2] for p in params_list]
+
+    if method == "mean":
+        qi_agg = np.mean(qi_values)
+        di_agg = np.mean(di_values)
+        b_agg = np.mean(b_values)
+    elif method == "median":
+        qi_agg = np.median(qi_values)
+        di_agg = np.median(di_values)
+        b_agg = np.median(b_values)
+    elif method == "p50":
+        qi_agg = np.percentile(qi_values, 50)
+        di_agg = np.percentile(di_values, 50)
+        b_agg = np.percentile(b_values, 50)
+    else:
+        raise ValueError(f"Unknown aggregation method: {method}")
+
+    # Generate type curve
+    type_params = ArpsParams(qi=qi_agg, di=di_agg, b=b_agg)
+    t_max = 240  # 20 years
+    t = np.arange(0, t_max, 1.0)
+    q_curve = predict_arps(t, type_params)
+
+    # Create index starting from first production
+    dates = pd.date_range("2000-01-01", periods=len(q_curve), freq="MS")
+    type_curve = pd.Series(q_curve, index=dates, name=f"type_curve_{group_name}")
+
+    return type_curve

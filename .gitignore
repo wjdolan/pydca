@@ -90,5 +90,9 @@ Deep-AR for Production Forecasting.md
 _untracked/
 wip/
 
+# Academic articles (not for public repo)
+academic_articles/
+
 # Data files
 data/*.parquet
+academic_articles/

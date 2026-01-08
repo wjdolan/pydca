@@ -4,10 +4,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from decline_curve.deep_learning import (
-    ControlVariables,
-    StaticFeatures,
-)
+from decline_curve.deep_learning import ControlVariables, StaticFeatures
 
 
 class TestStaticFeatures:

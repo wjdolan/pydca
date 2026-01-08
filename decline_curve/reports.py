@@ -4,7 +4,12 @@ This module provides single-page summary reports for wells and fields,
 including HTML and PDF output formats.
 """
 
+from pathlib import Path
 from typing import Dict, List, Optional
+
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
 
 from .artifacts import FitArtifact
 from .fit_diagnostics import DiagnosticsResult
@@ -12,6 +17,29 @@ from .fitting import FitResult
 from .logging_config import get_logger
 
 logger = get_logger(__name__)
+
+# Try to import reportlab for PDF generation
+try:
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import letter
+    from reportlab.lib.styles import getSampleStyleSheet
+    from reportlab.lib.units import inch
+    from reportlab.platypus import (
+        Image,
+        Paragraph,
+        SimpleDocTemplate,
+        Spacer,
+        Table,
+        TableStyle,
+    )
+
+    REPORTLAB_AVAILABLE = True
+except ImportError:
+    REPORTLAB_AVAILABLE = False
+    logger.debug(
+        "reportlab not available. Install with: pip install reportlab. "
+        "PDF generation will not be available."
+    )
 
 
 def generate_well_report(
@@ -41,18 +69,271 @@ def generate_well_report(
         well_id = artifact.metadata.run_id if artifact else "well_001"
         output_path = f"{well_id}_report.html"
 
-    logger.info(f"Generating well report: {output_path}", extra={"format": format})
+    logger.info(f"Generating well report: {output_path} (format: {format})")
 
-    # Generate HTML report
+    format_handlers = {
+        "pdf": lambda: _handle_pdf_report(
+            fit_result, diagnostics, artifact, output_path
+        ),
+        "html": lambda: _handle_html_report(
+            fit_result, diagnostics, artifact, output_path
+        ),
+    }
+
+    handler = format_handlers.get(format, format_handlers["html"])
+    return handler()
+
+
+def _handle_pdf_report(
+    fit_result: FitResult,
+    diagnostics: Optional[DiagnosticsResult],
+    artifact: Optional[FitArtifact],
+    output_path: str,
+) -> str:
+    """Handle PDF report generation."""
+    if not REPORTLAB_AVAILABLE:
+        logger.warning(
+            "reportlab not available. Install with: pip install reportlab. "
+            "Saving HTML instead."
+        )
+        return _handle_html_report(fit_result, diagnostics, artifact, output_path)
+
+    pdf_path = (
+        output_path.replace(".html", ".pdf")
+        if output_path.endswith(".html")
+        else output_path
+    )
+    if not pdf_path.endswith(".pdf"):
+        pdf_path += ".pdf"
+    _generate_pdf_report(fit_result, diagnostics, artifact, pdf_path)
+    return pdf_path
+
+
+def _handle_html_report(
+    fit_result: FitResult,
+    diagnostics: Optional[DiagnosticsResult],
+    artifact: Optional[FitArtifact],
+    output_path: str,
+) -> str:
+    """Handle HTML report generation."""
     html_content = _generate_html_report(fit_result, diagnostics, artifact)
-
-    # Write to file
     with open(output_path, "w") as f:
         f.write(html_content)
+    return output_path
 
-    # Convert to PDF if requested (would require additional library)
-    if format == "pdf":
-        logger.warning("PDF generation not yet implemented, saving HTML instead")
+
+def _generate_pdf_report(
+    fit_result: FitResult,
+    diagnostics: Optional[DiagnosticsResult],
+    artifact: Optional[FitArtifact],
+    output_path: str,
+    plot_path: Optional[str] = None,
+) -> None:
+    """Generate PDF report using reportlab."""
+    if not REPORTLAB_AVAILABLE:
+        raise ImportError(
+            "reportlab not available. Install with: pip install reportlab"
+        )
+
+    doc = SimpleDocTemplate(output_path, pagesize=letter)
+    story = []
+    styles = getSampleStyleSheet()
+
+    title = Paragraph("Decline Curve Analysis Report", styles["Title"])
+    story.append(title)
+    story.append(Spacer(1, 0.2 * inch))
+
+    model_name = (
+        fit_result.model.name if hasattr(fit_result.model, "name") else "Unknown"
+    )
+    story.append(Paragraph("<b>Model Information</b>", styles["Heading2"]))
+    story.append(Paragraph(f"Model: {model_name}", styles["Normal"]))
+    story.append(
+        Paragraph(
+            f"Fit Status: {'Success' if fit_result.success else 'Failed'}",
+            styles["Normal"],
+        )
+    )
+
+    if diagnostics:
+        grade = diagnostics.grade if diagnostics else "N/A"
+        quality_score = diagnostics.quality_score if diagnostics else None
+        if grade != "N/A":
+            story.append(Paragraph(f"Grade: {grade}", styles["Normal"]))
+        if quality_score is not None:
+            story.append(
+                Paragraph(f"Quality Score: {quality_score:.2f}", styles["Normal"])
+            )
+
+    story.append(Spacer(1, 0.2 * inch))
+
+    params = fit_result.params
+    param_data = [["Parameter", "Value"]]
+    param_data.extend([[param, f"{value:.4f}"] for param, value in params.items()])
+
+    param_table = Table(param_data)
+    param_table.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, 0), colors.grey),
+                ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
+                ("ALIGN", (0, 0), (-1, -1), "LEFT"),
+                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                ("FONTSIZE", (0, 0), (-1, 0), 12),
+                ("BOTTOMPADDING", (0, 0), (-1, 0), 12),
+                ("BACKGROUND", (0, 1), (-1, -1), colors.beige),
+                ("GRID", (0, 0), (-1, -1), 1, colors.black),
+            ]
+        )
+    )
+    story.append(param_table)
+    story.append(Spacer(1, 0.2 * inch))
+
+    if diagnostics:
+        story.append(Paragraph("<b>Diagnostics</b>", styles["Heading2"]))
+        diag_data = [
+            ["Metric", "Value"],
+            ["RMSE", f"{diagnostics.metrics.get('rmse', 0):.4f}"],
+            ["MAE", f"{diagnostics.metrics.get('mae', 0):.4f}"],
+            ["R²", f"{diagnostics.metrics.get('r_squared', 0):.4f}"],
+        ]
+
+        diag_table = Table(diag_data)
+        diag_table.setStyle(
+            TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.grey),
+                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
+                    ("ALIGN", (0, 0), (-1, -1), "LEFT"),
+                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                    ("FONTSIZE", (0, 0), (-1, 0), 12),
+                    ("BOTTOMPADDING", (0, 0), (-1, 0), 12),
+                    ("BACKGROUND", (0, 1), (-1, -1), colors.beige),
+                    ("GRID", (0, 0), (-1, -1), 1, colors.black),
+                ]
+            )
+        )
+        story.append(diag_table)
+        story.append(Spacer(1, 0.2 * inch))
+
+    if artifact:
+        story.append(Paragraph("<b>Provenance</b>", styles["Heading2"]))
+        story.append(Paragraph(f"Run ID: {artifact.metadata.run_id}", styles["Normal"]))
+        story.append(
+            Paragraph(f"Timestamp: {artifact.metadata.timestamp}", styles["Normal"])
+        )
+        story.append(
+            Paragraph(
+                f"Package Version: {artifact.metadata.package_version}",
+                styles["Normal"],
+            )
+        )
+        story.append(Spacer(1, 0.2 * inch))
+
+    if plot_path and Path(plot_path).exists():
+        try:
+            img = Image(plot_path, width=6 * inch, height=4 * inch)
+            story.append(Spacer(1, 0.2 * inch))
+            story.append(Paragraph("<b>Forecast Plot</b>", styles["Heading2"]))
+            story.append(img)
+        except Exception as e:
+            logger.warning(f"Could not embed plot: {e}")
+
+    doc.build(story)
+    logger.info(f"PDF report saved to {output_path}")
+
+
+def generate_field_pdf_report(
+    well_results: List[Dict],
+    output_path: Optional[str] = None,
+    title: str = "Field Summary Report",
+) -> str:
+    """Generate field summary PDF report."""
+    if not REPORTLAB_AVAILABLE:
+        raise ImportError(
+            "reportlab not available. Install with: pip install reportlab"
+        )
+
+    if output_path is None:
+        output_path = "field_summary.pdf"
+
+    df = pd.DataFrame(well_results)
+
+    doc = SimpleDocTemplate(output_path, pagesize=letter)
+    story = []
+    styles = getSampleStyleSheet()
+
+    title_para = Paragraph(title, styles["Title"])
+    story.append(title_para)
+    story.append(Spacer(1, 0.2 * inch))
+
+    story.append(Paragraph("<b>Summary Statistics</b>", styles["Heading2"]))
+    summary_data = [["Metric", "Value"]]
+    summary_data.append(["Total Wells", str(len(df))])
+
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    sum_metrics = {"eur", "npv", "p50_eur", "p50_npv"}
+    for col in numeric_cols[:10]:
+        if col in sum_metrics:
+            summary_data.append([f"{col} (Total)", f"{df[col].sum():,.0f}"])
+            summary_data.append([f"{col} (Mean)", f"{df[col].mean():,.0f}"])
+
+    summary_table = Table(summary_data)
+    summary_table.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, 0), colors.grey),
+                ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
+                ("ALIGN", (0, 0), (-1, -1), "LEFT"),
+                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                ("FONTSIZE", (0, 0), (-1, 0), 12),
+                ("BOTTOMPADDING", (0, 0), (-1, 0), 12),
+                ("BACKGROUND", (0, 1), (-1, -1), colors.beige),
+                ("GRID", (0, 0), (-1, -1), 1, colors.black),
+            ]
+        )
+    )
+    story.append(summary_table)
+    story.append(Spacer(1, 0.2 * inch))
+
+    story.append(Paragraph("<b>Well Results (Sample)</b>", styles["Heading2"]))
+    well_data = [list(df.columns[:8])]
+    well_data.extend(
+        [
+            [str(row[col])[:20] for col in df.columns[:8]]
+            for _, row in df.head(20).iterrows()
+        ]
+    )
+
+    well_table = Table(well_data)
+    well_table.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, 0), colors.grey),
+                ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
+                ("ALIGN", (0, 0), (-1, -1), "LEFT"),
+                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                ("FONTSIZE", (0, 0), (-1, 0), 10),
+                ("FONTSIZE", (0, 1), (-1, -1), 8),
+                ("BOTTOMPADDING", (0, 0), (-1, 0), 12),
+                ("BACKGROUND", (0, 1), (-1, -1), colors.beige),
+                ("GRID", (0, 0), (-1, -1), 1, colors.black),
+            ]
+        )
+    )
+    story.append(well_table)
+
+    if len(df) > 20:
+        story.append(Spacer(1, 0.1 * inch))
+        story.append(
+            Paragraph(
+                f"<i>Showing first 20 of {len(df)} wells. Full data available in CSV export.</i>",
+                styles["Normal"],
+            )
+        )
+
+    doc.build(story)
+    logger.info(f"Field PDF report saved to {output_path}")
 
     return output_path
 
@@ -186,9 +467,6 @@ def generate_field_summary(
     # Save to CSV
     df.to_csv(output_path, index=False)
 
-    logger.info(
-        f"Generated field summary: {len(well_results)} wells",
-        extra={"output_path": output_path},
-    )
+    logger.info(f"Generated field summary: {len(well_results)} wells -> {output_path}")
 
     return output_path

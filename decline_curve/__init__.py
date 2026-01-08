@@ -5,13 +5,29 @@ forecasting, data utilities, and ML models.
 """
 
 from . import (  # noqa: F401
+    catalog,
+    config,
     dca,
     eur_estimation,
+    integrations,
+    model_comparison,
+    model_interface,
+    model_registry,
     monte_carlo,
     multiphase,
     panel_analysis,
     panel_analysis_sweep,
+    parameter_resample,
+    portfolio,
+    probabilistic_forecast,
     profiling,
+    risk_report,
+    runner,
+    scenarios,
+    schemas,
+    segmented_decline,
+    spatial_kriging,
+    uncertainty_core,
 )
 from .forecast_statistical import (  # noqa: F401
     calculate_confidence_intervals,

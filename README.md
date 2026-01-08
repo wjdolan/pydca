@@ -14,11 +14,34 @@ Whether you're analyzing a single well or benchmarking hundreds across a field, 
 
 The library combines traditional petroleum engineering methods with modern forecasting techniques, providing probabilistic forecasts, economic analysis, and batch processing capabilities. It uses Numba JIT compilation and parallel processing for fast execution on large datasets, making it practical for field-wide analysis and sensitivity studies.
 
-## Quick start
+## Installation
 
 ```bash
 pip install decline-curve
 ```
+
+### Optional Dependencies
+
+For additional features, install optional extras:
+
+```bash
+# Statistical models (ARIMA)
+pip install decline-curve[stats]
+
+# Large language models (Chronos, TimesFM)
+pip install decline-curve[llm]
+
+# Spatial analysis (kriging)
+pip install decline-curve[spatial]
+
+# Ecosystem integrations (pygeomodeling, geosuite)
+pip install decline-curve[integrations]
+
+# All optional features
+pip install decline-curve[all]
+```
+
+## Quick start
 
 ```python
 import pandas as pd
@@ -34,13 +57,15 @@ series = pd.Series(production, index=dates, name='oil_bbl')
 forecast = dca.forecast(series, model='arps', kind='hyperbolic', horizon=12)
 ```
 
+Command line interface:
+
 ```bash
 dca fit production.csv --well WELL_001 --model arps
 ```
 
 ## Examples
 
-See [examples/01_basic_dca_analysis.ipynb](examples/01_basic_dca_analysis.ipynb) for a complete workflow and [examples/02_economic_evaluation.ipynb](examples/02_economic_evaluation.ipynb) for economic analysis.
+See `examples/01_basic_dca_analysis.ipynb` for a complete workflow and `examples/02_economic_evaluation.ipynb` for economic analysis.
 
 ## Project status
 
@@ -50,10 +75,20 @@ The library is in active development with core functionality stable. Current foc
 
 We're adding support for more foundation models and ensemble forecasting methods. Data quality tools and automated segmentation are being enhanced. The batch processing pipeline is being optimized for larger field datasets.
 
+## Ecosystem Integration
+
+This library integrates with other tools in the ecosystem:
+
+- **signalplot**: Minimalist plotting design for publication-ready figures (used by default)
+- **pygeomodeling**: Advanced Gaussian Process Regression and Kriging for spatial EUR interpolation
+- **geosuite**: Professional subsurface analysis tools for petrophysics and geomechanics
+
+All plots use signalplot's minimalist aesthetic by default when available. See `examples/10_ecosystem_integration_example.py` for integration examples.
+
 ## Contributing
 
-We welcome contributions. Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+We welcome contributions. Please see `CONTRIBUTING.md` for guidelines.
 
 ## License
 
-Licensed under the Apache License 2.0. See [LICENSE](LICENSE) for details.
+Licensed under the Apache License 2.0. See `LICENSE` for details.

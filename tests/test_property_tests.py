@@ -6,11 +6,7 @@ These tests verify mathematical properties that should hold for all models.
 import numpy as np
 import pytest
 
-from decline_curve.models_arps import (
-    ExponentialArps,
-    HarmonicArps,
-    HyperbolicArps,
-)
+from decline_curve.models_arps import ExponentialArps, HarmonicArps, HyperbolicArps
 from decline_curve.test_utils import (
     check_model_properties,
     generate_piecewise_decline,
