@@ -62,6 +62,20 @@ Covers:
 
 ---
 
+### 05_configuration_based_workflows.ipynb
+**Running workflows using configuration files**
+
+Covers:
+- Batch job configuration (TOML/YAML)
+- Benchmark factory parameter sweeps
+- Panel analysis configuration
+- Creating configs programmatically
+- Config file formats and best practices
+
+**Best for**: Users who prefer config files over writing Python code, batch processing workflows
+
+---
+
 ## Best Practices Demonstrated
 
 All notebooks follow these best practices:
