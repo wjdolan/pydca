@@ -200,6 +200,8 @@ addopts = [
   "--cov-report=term-missing",
   "--cov-report=html",
   "--disable-warnings",
+  "--durations=10",
+  "--maxfail=5",
 ]
 markers = [
   "slow: marks tests as slow (deselect with '-m \"not slow\"')",
