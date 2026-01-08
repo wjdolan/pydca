@@ -2,7 +2,7 @@
 
 import os
 import tempfile
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pandas as pd
 import pytest
@@ -50,6 +50,7 @@ class TestMainCLI:
                 "argv",
                 [
                     "__main__.py",
+                    "--csv",
                     csv_path,
                     "--well",
                     "WELL_001",
@@ -97,6 +98,7 @@ class TestMainCLI:
                 "argv",
                 [
                     "__main__.py",
+                    "--csv",
                     csv_path,
                     "--benchmark",
                     "--model",
@@ -145,7 +147,9 @@ class TestMainCLI:
             import sys
 
             with patch.object(
-                sys, "argv", ["__main__.py", csv_path, "--model", "arps"]
+                sys,
+                "argv",
+                ["__main__.py", "--csv", csv_path, "--model", "arps"],
             ):
                 with pytest.raises(ValueError, match="Must provide --well"):
                     main()
@@ -176,6 +180,7 @@ class TestMainCLI:
                     "argv",
                     [
                         "__main__.py",
+                        "--csv",
                         csv_path,
                         "--well",
                         "WELL_001",
@@ -185,7 +190,7 @@ class TestMainCLI:
                         "6",
                     ],
                 ):
-                    with patch("decline_curve.dca.plot") as mock_plot:
+                    with patch("decline_curve.dca.plot"):
                         with patch("decline_curve.dca.forecast") as mock_forecast:
                             mock_forecast.return_value = pd.Series(
                                 [100] * 6,
@@ -223,6 +228,7 @@ class TestMainCLI:
                     "argv",
                     [
                         "__main__.py",
+                        "--csv",
                         csv_path,
                         "--well",
                         "WELL_001",
@@ -234,7 +240,7 @@ class TestMainCLI:
                         "6",
                     ],
                 ):
-                    with patch("decline_curve.dca.plot") as mock_plot:
+                    with patch("decline_curve.dca.plot"):
                         with patch("decline_curve.dca.forecast") as mock_forecast:
                             mock_forecast.return_value = pd.Series(
                                 [100] * 6,
@@ -271,6 +277,7 @@ class TestMainCLI:
                 "argv",
                 [
                     "__main__.py",
+                    "--csv",
                     csv_path,
                     "--well",
                     "WELL_001",
@@ -281,7 +288,7 @@ class TestMainCLI:
                     "--verbose",
                 ],
             ):
-                with patch("decline_curve.dca.plot") as mock_plot:
+                with patch("decline_curve.dca.plot"):
                     with patch("decline_curve.dca.forecast") as mock_forecast:
                         mock_forecast.return_value = pd.Series(
                             [100] * 6,
@@ -300,7 +307,9 @@ class TestMainCLI:
         import sys
 
         with patch.object(
-            sys, "argv", ["__main__.py", "nonexistent.csv", "--well", "WELL_001"]
+            sys,
+            "argv",
+            ["__main__.py", "--csv", "nonexistent.csv", "--well", "WELL_001"],
         ):
             with pytest.raises((FileNotFoundError, pd.errors.EmptyDataError)):
                 main()
