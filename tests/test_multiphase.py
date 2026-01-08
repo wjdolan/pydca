@@ -309,9 +309,8 @@ class TestEdgeCases:
         dates = pd.DatetimeIndex([])
         oil = pd.Series([], index=dates, dtype=float)
 
-        data = MultiPhaseData(oil=oil)
-        assert data.length == 0
-        assert data.phases == ["oil"]
+        with pytest.raises(ValueError, match="Oil production data is required"):
+            MultiPhaseData(oil=oil)
 
     def test_single_data_point(self):
         """Test with single data point."""
