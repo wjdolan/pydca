@@ -6,7 +6,17 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from decline_curve.forecast_arima import forecast_arima
+try:
+    from decline_curve.forecast_arima import forecast_arima
+
+    ARIMA_AVAILABLE = True
+except ImportError:
+    ARIMA_AVAILABLE = False
+    forecast_arima = None
+
+pytestmark = pytest.mark.skipif(
+    not ARIMA_AVAILABLE, reason="ARIMA forecasting not available (statsmodels required)"
+)
 
 
 class TestARIMAForecasting:

@@ -4,7 +4,14 @@ from typing import Optional
 
 import numpy as np
 import pandas as pd
-from statsmodels.tsa.arima.model import ARIMA
+
+try:
+    from statsmodels.tsa.arima.model import ARIMA
+
+    STATSMODELS_AVAILABLE = True
+except ImportError:
+    STATSMODELS_AVAILABLE = False
+    ARIMA = None
 
 
 def forecast_arima(
@@ -102,6 +109,12 @@ def forecast_arima(
                 ]
 
             return pd.Series(forecast_values, index=future_idx, name="arima_forecast")
+
+        if not STATSMODELS_AVAILABLE:
+            raise ImportError(
+                "statsmodels is required for ARIMA forecasting. "
+                "Install with: pip install 'decline-curve[stats]'"
+            )
 
         if order is None:
             # Use simple default ARIMA(1,1,1) order
