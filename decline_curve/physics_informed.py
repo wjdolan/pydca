@@ -706,6 +706,10 @@ def material_balance_forecast(
     # Get initial guess
     initial_params = model.initial_guess(t_days, q_values)
 
+    # Store non-numeric parameters separately (not for fitting)
+    pvt_method = initial_params.pop("pvt_method", "standing")
+    drive_mechanism = initial_params.pop("drive_mechanism", "solution_gas")
+
     # Override with provided parameters if available
     if material_balance_params:
         initial_params.update(
@@ -717,14 +721,24 @@ def material_balance_forecast(
                 "temperature": material_balance_params.temperature,
                 "api_gravity": material_balance_params.api_gravity,
                 "gas_gravity": material_balance_params.gas_gravity,
-                "pvt_method": material_balance_params.pvt_method,
             }
         )
+        # Store non-numeric parameters separately (not in initial_guess)
+        pvt_method = material_balance_params.pvt_method
+        drive_mechanism = getattr(
+            material_balance_params, "drive_mechanism", "solution_gas"
+        )
 
-    # Create fit spec
+    # Create fit spec (only numeric parameters - remove any remaining strings)
+    numeric_params = {
+        k: v
+        for k, v in initial_params.items()
+        if isinstance(v, (int, float, np.number))
+    }
+
     fit_spec = FitSpec(
         model=model,
-        initial_params=initial_params,
+        initial_guess=numeric_params,
         min_points=3,
     )
 
@@ -764,7 +778,12 @@ def material_balance_forecast(
 
     forecast_t_days = np.array([(d - dates[0]).days for d in forecast_dates])
 
-    forecast_rates = model.rate(forecast_t_days, fit_result.params)
+    # Add non-numeric parameters back to params for forecasting
+    forecast_params = fit_result.params.copy()
+    forecast_params["pvt_method"] = pvt_method
+    forecast_params["drive_mechanism"] = drive_mechanism
+
+    forecast_rates = model.rate(forecast_t_days, forecast_params)
 
     # Apply physics constraints
     constrained_rates = apply_physics_constraints(
