@@ -133,10 +133,10 @@ class TestConfigFromFile:
     def test_from_toml(self):
         """Test loading from TOML file."""
         try:
-            import tomli
+            import tomli  # noqa: F401
         except ImportError:
             try:
-                import tomllib
+                import tomllib  # noqa: F401
             except ImportError:
                 pytest.skip("tomli/tomllib not available")
 
@@ -241,10 +241,10 @@ class TestCreateExampleConfig:
     def test_create_toml_example(self):
         """Test creating TOML example config."""
         try:
-            import tomli
+            import tomli  # noqa: F401
         except ImportError:
             try:
-                import tomllib
+                import tomllib  # noqa: F401
             except ImportError:
                 pytest.skip("tomli/tomllib not available")
 
@@ -263,11 +263,8 @@ class TestEdgeCases:
 
     def test_empty_config_dict(self):
         """Test with empty config dictionary."""
-        config = BatchJobConfig.from_dict({})
-
-        # Should use all defaults
-        assert config.data.path == ""
-        assert config.model.model == "arps"
+        with pytest.raises(ValueError, match="data.path"):
+            BatchJobConfig.from_dict({})
 
     def test_invalid_file_path(self):
         """Test with invalid file path."""

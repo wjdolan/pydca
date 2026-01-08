@@ -14,12 +14,12 @@ logger = get_logger(__name__)
 
 # Try to import TOML support
 try:
-    import tomli
+    import tomli  # noqa: F401
 
     TOML_AVAILABLE = True
 except ImportError:
     try:
-        import tomllib
+        import tomllib  # noqa: F401
 
         TOML_AVAILABLE = True
     except ImportError:
@@ -150,7 +150,13 @@ class BatchJobConfig:
         Returns:
             BatchJobConfig instance
         """
-        data = DataSourceConfig(**config_dict.get("data", {}))
+        data_dict = config_dict.get("data", {})
+        if not data_dict or "path" not in data_dict:
+            raise ValueError(
+                "Configuration must include 'data.path' - data source path is required"
+            )
+
+        data = DataSourceConfig(**data_dict)
         model = ModelConfig(**config_dict.get("model", {}))
         economics = EconomicConfig(**config_dict.get("economics", {}))
         output = OutputConfig(**config_dict.get("output", {}))
@@ -194,7 +200,7 @@ class BatchJobConfig:
         try:
             import tomli as toml_loader
         except ImportError:
-            import tomllib as toml_loader
+            import tomllib as toml_loader  # noqa: F401
 
         with open(config_path, "rb") as f:
             config_dict = toml_loader.load(f)
