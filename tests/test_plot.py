@@ -277,7 +277,7 @@ class TestPlottingConfiguration:
 
     def test_style_parameters(self):
         """Test that style parameters are properly set."""
-        tufte_style()
+        minimal_style()
 
         # Check key Tufte-style parameters
         assert plt.rcParams["axes.linewidth"] == 0.5
