@@ -82,13 +82,17 @@ def aggregate_by_category(
             else:
                 agg_dict[metric] = ["mean", "std"]
 
-    aggregated = grouped.agg(agg_dict)
-
-    # Flatten column names using vectorized operation
-    aggregated.columns = [
-        "_".join(col).strip() if len(col) > 1 and col[1] else col[0]
-        for col in aggregated.columns.values
-    ]
+    # Handle case where no metrics are found
+    if agg_dict:
+        aggregated = grouped.agg(agg_dict)
+        # Flatten column names using vectorized operation
+        aggregated.columns = [
+            "_".join(col).strip() if len(col) > 1 and col[1] else col[0]
+            for col in aggregated.columns.values
+        ]
+    else:
+        # No metrics to aggregate, just create empty DataFrame with category
+        aggregated = grouped.first().iloc[:, :0]  # Empty DataFrame with correct index
 
     # Add well counts
     aggregated["well_count"] = grouped.size()
