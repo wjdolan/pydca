@@ -303,28 +303,6 @@ def _create_prediction_grid(
 
     return target_locations
 
-        # Extract variogram parameters if available
-        variogram_params = None
-        if hasattr(kriging, "variogram_model_parameters"):
-            params = kriging.variogram_model_parameters
-            variogram_params = {
-                "sill": params[0] if len(params) > 0 else None,
-                "range": params[1] if len(params) > 1 else None,
-                "nugget": params[2] if len(params) > 2 else None,
-            }
-
-        return KrigingResult(
-            predicted_values=z_pred,
-            uncertainty=uncertainty,
-            target_locations=target_locations,
-            variogram_params=variogram_params,
-            method=method,
-        )
-
-    except Exception as e:
-        logger.error(f"PyKrige kriging failed: {e}")
-        raise
-
 
 def _krige_pygeomodeling(
     lon: np.ndarray,
