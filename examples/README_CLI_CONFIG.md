@@ -26,7 +26,7 @@ value_col = "oil_bbl"
 3. **Run the analysis**:
 
 ```bash
-python examples/config_workflow_example.py my_config.toml
+python -m decline_curve my_config.toml
 ```
 
 ## Command Line Interface
@@ -34,24 +34,24 @@ python examples/config_workflow_example.py my_config.toml
 ### Basic Usage
 
 ```bash
-# Forecast a single well
-dca fit production.csv --well WELL_001 --model arps --horizon 12
+# Run batch job from config (primary mode)
+python -m decline_curve batch_config.toml
 
-# Benchmark all wells
-dca fit production.csv --benchmark --top_n 10
+# Run benchmark from config
+python -m decline_curve benchmark_config.toml --workflow benchmark
 
-# Use different model
-dca fit production.csv --well WELL_001 --model arima --horizon 24
+# Run sensitivity analysis from config
+python -m decline_curve sensitivity_config.toml --workflow sensitivity
 ```
 
 ### With Logging
 
 ```bash
 # Verbose output
-dca fit production.csv --well WELL_001 --verbose
+python -m decline_curve batch_config.toml --verbose
 
-# Save log to file
-dca fit production.csv --well WELL_001 --log-level INFO
+# Save log to file (via config)
+python -m decline_curve batch_config.toml --log-level INFO
 ```
 
 ## Configuration File Format
@@ -114,18 +114,18 @@ python -c "from decline_curve.config import create_example_config; create_exampl
 # 2. Edit config to point to your data
 
 # 3. Run batch analysis
-python examples/config_workflow_example.py batch_config.toml
+python -m decline_curve batch_config.toml
 ```
 
-### Example 3: Using CLI for Quick Analysis
+### Example 3: Legacy CSV Mode (Quick Analysis)
 
 ```bash
 # Quick forecast
-dca fit production.csv --well WELL_001 --model arps > forecast.txt
+python -m decline_curve --csv production.csv --well WELL_001 --model arps > forecast.txt
 
-# Compare models
-dca fit production.csv --benchmark --model arps > arps_results.txt
-dca fit production.csv --benchmark --model arima > arima_results.txt
+# Benchmark models
+python -m decline_curve --csv production.csv --benchmark --model arps > arps_results.txt
+python -m decline_curve --csv production.csv --benchmark --model arima > arima_results.txt
 ```
 
 ## Tips for Spreadsheet Users

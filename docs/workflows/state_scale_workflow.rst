@@ -154,8 +154,8 @@ Step 5: Run Large-Scale Analysis
 
    print(f"\nAnalysis Complete:")
    print(f"  Total wells processed: {results.summary.total_wells}")
-   print(f"  Successful: {results.summary.successful_wells}")
-   print(f"  Failed: {results.summary.failed_wells}")
+   print(f"  Successful: {results.summary['n_successful']}")
+   print(f"  Failed: {results.summary['n_failed']}")
    print(f"  Success rate: {results.summary.success_rate:.1f}%")
    print(f"  Total time: {results.summary.total_time:.1f} seconds")
    print(f"  Throughput: {results.summary.throughput_wells_per_sec:.1f} wells/sec")

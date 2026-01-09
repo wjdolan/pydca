@@ -938,25 +938,38 @@ def run_batch_job(config_path: str | Path | dict | Any) -> dict:
     df[config.data.date_col] = pd.to_datetime(df[config.data.date_col])
 
     # Validate and standardize
-    from .schemas import ProductionInputSchema, ProductionOutputSchema
+    from .schemas import (
+        ProductionOutputSchema,
+        convert_to_input_schema,
+        validate_input_schema,
+    )
 
-    df_standard = ProductionInputSchema.standardize(df)
+    df_standard = convert_to_input_schema(
+        df,
+        well_id_col=config.data.well_id_col,
+        date_col=config.data.date_col,
+        oil_col=config.data.value_col,
+    )
     # Validate will raise ValueError if invalid
-    ProductionInputSchema.validate(df_standard)
+    validate_input_schema(df_standard)
+
+    well_id_col = "well_id"
+    date_col = "date"
+    value_col = "oil"
 
     logger.info(
         f"Loaded {len(df_standard):,} records for "
-        f"{df_standard[config.data.well_id_col].nunique():,} wells"
+        f"{df_standard[well_id_col].nunique():,} wells"
     )
 
     # Define forecast function from config
     def forecast_well_func(well_data: pd.DataFrame) -> WellResult:
         """Forecast function for a single well."""
-        well_id = well_data[config.data.well_id_col].iloc[0]
-        well_data = well_data.sort_values(config.data.date_col)
+        well_id = well_data[well_id_col].iloc[0]
+        well_data = well_data.sort_values(date_col)
 
         # Create production series
-        series = well_data.set_index(config.data.date_col)[config.data.value_col]
+        series = well_data.set_index(date_col)[value_col]
         series = series.asfreq("MS", fill_value=0)
 
         # Filter to valid production
@@ -1030,7 +1043,7 @@ def run_batch_job(config_path: str | Path | dict | Any) -> dict:
     results = runner.run(
         df_standard,
         forecast_func=forecast_well_func,
-        well_id_col=config.data.well_id_col,
+        well_id_col=well_id_col,
     )
 
     # Convert to output schema
@@ -1071,8 +1084,8 @@ def run_batch_job(config_path: str | Path | dict | Any) -> dict:
         logger.info(f"Saved report to {report_path}")
 
     logger.info(
-        f"Batch job complete: {results.summary.successful_wells} successful, "
-        f"{results.summary.failed_wells} failed"
+        f"Batch job complete: {results.summary['n_successful']} successful, "
+        f"{results.summary['n_failed']} failed"
     )
 
     return {

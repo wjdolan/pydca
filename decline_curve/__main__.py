@@ -109,20 +109,17 @@ Examples:
             if workflow == "benchmark":
                 results = dca.run_benchmark(config_path)
                 logger.info(
-                    f"✓ Benchmark complete: {len(results['results'])} wells processed"
+                    f"Benchmark complete: {len(results['results'])} wells processed"
                 )
             elif workflow == "sensitivity":
                 results = dca.run_sensitivity_analysis(config_path)
                 logger.info(
-                    f"✓ Sensitivity analysis complete: "
-                    f"{len(results['results'])} combinations tested"
+                    f"Sensitivity analysis complete: {len(results['results'])} combinations tested"
                 )
             else:  # batch
                 results = dca.run_batch_job(config_path)
                 logger.info(
-                    f"✓ Batch job complete: "
-                    f"{results['summary'].successful_wells} successful, "
-                    f"{results['summary'].failed_wells} failed"
+                    f"Batch job complete: {results['summary']['n_successful']} successful, {results['summary']['n_failed']} failed"
                 )
             logger.info(f"Results saved to: {results['output_dir']}")
         except Exception as e:

@@ -57,10 +57,20 @@ series = pd.Series(production, index=dates, name='oil_bbl')
 forecast = dca.forecast(series, model='arps', kind='hyperbolic', horizon=12)
 ```
 
-Command line interface:
+Command line interface (config-driven):
 
 ```bash
-dca fit production.csv --well WELL_001 --model arps
+# Run a batch job from config
+python -m decline_curve examples/config_example.toml
+
+# Or use the installed script
+dca examples/config_example.toml
+```
+
+Legacy CSV mode:
+
+```bash
+python -m decline_curve --csv production.csv --well WELL_001 --model arps --horizon 12
 ```
 
 ## Examples

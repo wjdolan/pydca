@@ -12,7 +12,11 @@ from pathlib import Path
 from decline_curve.config import BatchJobConfig
 from decline_curve.logging_config import configure_logging
 from decline_curve.runner import FieldScaleRunner, RunnerConfig
-from decline_curve.schemas import ProductionInputSchema, ProductionOutputSchema
+from decline_curve.schemas import (
+    ProductionOutputSchema,
+    convert_to_input_schema,
+    validate_input_schema,
+)
 
 # Step 1: Load configuration
 config_path = sys.argv[1] if len(sys.argv) > 1 else "examples/config_example.toml"
@@ -47,15 +51,24 @@ else:
 df[config.data.date_col] = pd.to_datetime(df[config.data.date_col])
 
 # Validate and standardize
-df_standard = ProductionInputSchema.standardize(df)
-validation = ProductionInputSchema.validate(df_standard)
-
-if not validation["valid"]:
-    print(f"Validation errors: {validation['errors']}")
+df_standard = convert_to_input_schema(
+    df,
+    well_id_col=config.data.well_id_col,
+    date_col=config.data.date_col,
+    oil_col=config.data.value_col,
+)
+try:
+    validate_input_schema(df_standard)
+except ValueError as exc:
+    print(f"Validation error: {exc}")
     sys.exit(1)
 
+well_id_col = "well_id"
+date_col = "date"
+value_col = "oil"
+
 print(
-    f"  Loaded {len(df_standard):,} records for {df_standard[config.data.well_id_col].nunique():,} wells"
+    f"  Loaded {len(df_standard):,} records for {df_standard[well_id_col].nunique():,} wells"
 )
 
 
@@ -64,11 +77,11 @@ def forecast_well(df_well):
     """Forecast function for a single well."""
     from decline_curve import dca
 
-    well_id = df_well[config.data.well_id_col].iloc[0]
-    df_well = df_well.sort_values(config.data.date_col)
+    well_id = df_well[well_id_col].iloc[0]
+    df_well = df_well.sort_values(date_col)
 
     # Create production series
-    series = df_well.set_index(config.data.date_col)[config.data.value_col]
+    series = df_well.set_index(date_col)[value_col]
     series = series.asfreq("MS", fill_value=0)
 
     # Filter to valid production
@@ -109,13 +122,13 @@ runner = FieldScaleRunner(runner_config)
 results = runner.run(
     df_standard,
     forecast_func=forecast_well,
-    well_id_col=config.data.well_id_col,
+    well_id_col=well_id_col,
 )
 
 print(f"\nAnalysis complete:")
-print(f"  Successful: {results.summary.successful_wells}")
-print(f"  Failed: {results.summary.failed_wells}")
-print(f"  Success rate: {results.summary.success_rate:.1f}%")
+print(f"  Successful: {results.summary['n_successful']}")
+print(f"  Failed: {results.summary['n_failed']}")
+print(f"  Success rate: {results.summary['success_rate']:.1f}%")
 
 # Step 6: Save outputs
 print(f"\nSaving outputs to: {config.output.output_dir}")
@@ -158,4 +171,4 @@ if config.output.save_reports:
     )
     print(f"  Report saved to: {report_path}")
 
-print(f"\n✓ Analysis complete! Results saved to {config.output.output_dir}")
+print(f"\nAnalysis complete! Results saved to {config.output.output_dir}")
