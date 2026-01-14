@@ -42,6 +42,25 @@ jupyter notebook
 
 Then open any `.ipynb` file in your browser.
 
+### Run All Notebooks From One Environment
+
+Use the helper runner to execute every notebook with the current Python
+environment and a single kernel:
+
+```bash
+# Optional: install and register a kernel for this env
+python -m ipykernel install --user --name decline-curve --display-name "Python (decline-curve)"
+
+# Execute all notebooks under examples/
+python scripts/run_notebooks.py --root examples --kernel decline-curve --inplace
+
+# Or via the CLI
+dca run-notebooks --root examples --kernel decline-curve --inplace
+```
+
+If you prefer not to modify the notebooks, omit `--inplace` and the executed
+copies will be written to `examples/notebook_runs/`.
+
 ## Example Descriptions
 
 ### 01 - Basic DCA Analysis

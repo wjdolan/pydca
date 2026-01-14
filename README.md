@@ -77,6 +77,15 @@ python -m decline_curve --csv production.csv --well WELL_001 --model arps --hori
 
 See `examples/01_basic_dca_analysis.ipynb` for a complete workflow and `examples/02_economic_evaluation.ipynb` for economic analysis.
 
+To execute all notebooks from one Python environment, use the runner in
+`scripts/run_notebooks.py` (see `examples/README.md` for details).
+
+You can also run it via the CLI:
+
+```bash
+dca run-notebooks --root examples --inplace
+```
+
 ## Project status
 
 The library is in active development with core functionality stable. Current focus is on expanding machine learning model support and improving uncertainty quantification methods.

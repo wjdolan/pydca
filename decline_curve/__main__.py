@@ -2,6 +2,7 @@
 
 import argparse
 import logging
+import sys
 from pathlib import Path
 
 import pandas as pd
@@ -14,6 +15,11 @@ logger = get_logger(__name__)
 
 def main():
     """Run the CLI entry point."""
+    if len(sys.argv) > 1 and sys.argv[1] == "run-notebooks":
+        from .notebook_runner import main as notebook_main
+
+        return notebook_main(sys.argv[2:])
+
     parser = argparse.ArgumentParser(
         description="Decline curve analysis tool - config-driven workflows",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -30,6 +36,9 @@ Examples:
 
   # Legacy mode: direct parameters
   python -m decline_curve --csv data.csv --well WELL_001
+
+  # Run notebooks from this environment
+  python -m decline_curve run-notebooks --root examples --inplace
         """,
     )
     parser.add_argument(
