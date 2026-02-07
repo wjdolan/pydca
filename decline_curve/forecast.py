@@ -87,8 +87,6 @@ class Forecaster:
             "timesfm",
             "chronos",
             "arima",
-            "deepar",
-            "ensemble",
             "exponential_smoothing",
             "moving_average",
             "linear_trend",

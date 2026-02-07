@@ -39,9 +39,6 @@ def forecast(
         "timesfm",
         "chronos",
         "arima",
-        "deepar",
-        "tft",
-        "ensemble",
         "exponential_smoothing",
         "moving_average",
         "linear_trend",
@@ -52,192 +49,27 @@ def forecast(
     kind: Optional[Literal["exponential", "harmonic", "hyperbolic"]] = "hyperbolic",
     horizon: int = 12,
     verbose: bool = False,
-    # DeepAR parameters
-    deepar_model: Optional[Any] = None,
-    tft_model: Optional[Any] = None,
-    production_data: Optional[pd.DataFrame] = None,
-    well_id: Optional[str] = None,
-    quantiles: Optional[list[float]] = [0.1, 0.5, 0.9],
-    return_interpretation: bool = False,
-    # Ensemble parameters
-    ensemble_models: Optional[list[str]] = None,
-    ensemble_weights: Optional[Any] = None,
-    ensemble_method: Literal["weighted", "confidence", "stacking"] = "weighted",
-    lstm_model: Optional[Any] = None,
 ) -> pd.Series:
     """Generate production forecast using specified model.
 
     Args:
         series: Historical production time series.
         model: Forecasting model to use.
-            Options: 'arps', 'timesfm', 'chronos', 'arima', 'deepar', 'tft',
-            'ensemble'.
+            Options: 'arps', 'timesfm', 'chronos', 'arima', and statistical
+            methods.
         kind: Arps decline type ('exponential', 'harmonic', 'hyperbolic').
         horizon: Number of periods to forecast.
         verbose: Print forecast details.
-        deepar_model: Pre-trained DeepAR model (required if model='deepar').
-        tft_model: Pre-trained TFT model (required if model='tft').
-        production_data: Production DataFrame (required for deepar/tft/ensemble
-            with ML models).
-        well_id: Well identifier (required for deepar/tft/ensemble with ML
-            models).
-        quantiles: Quantiles for DeepAR probabilistic forecasts
-            (default [0.1, 0.5, 0.9]).
-        return_interpretation: If True, return attention weights for TFT
-            (default False).
-        ensemble_models: List of models for ensemble
-            (default ['arps', 'lstm', 'deepar']).
-        ensemble_weights: Custom weights for ensemble (EnsembleWeights object).
-        ensemble_method: Ensemble combination method
-            ('weighted', 'confidence', 'stacking').
-        lstm_model: Pre-trained LSTM model (for ensemble).
-
-        Returns:
-            Forecasted production series (or dict with quantiles for DeepAR
-            probabilistic mode, or tuple (forecast, interpretation) for TFT
-            with return_interpretation=True).
+    
+    Returns:
+        Forecasted production series.
 
     Example:
         >>> # Arps forecast
         >>> forecast = dca.forecast(series, model='arps', horizon=12)
-        >>>
-        >>> # DeepAR probabilistic forecast (P50)
-        >>> deepar_forecast = dca.forecast(
-        ...     series, model='deepar', deepar_model=trained_model,
-        ...     production_data=df, well_id='WELL_001', quantiles=[0.5]
-        ... )
-        >>>
-        >>> # Ensemble forecast
-        >>> ensemble = dca.forecast(
-        ...     series, model='ensemble', ensemble_models=['arps', 'arima'],
-        ...     ensemble_method='weighted'
-        ... )
     """
-    # Handle DeepAR model
-    if model == "deepar":
-        try:
-            # DeepARForecaster is used via deepar_model parameter
-            pass
-
-            if deepar_model is None:
-                raise ValueError(
-                    "deepar_model required for DeepAR forecasting. "
-                    "Train using DeepARForecaster.fit() first."
-                )
-            if production_data is None or well_id is None:
-                raise ValueError(
-                    "production_data and well_id required for DeepAR forecasting"
-                )
-
-            # Get P50 (median) forecast by default
-            if quantiles is None:
-                quantiles = [0.5]
-
-            forecasts = deepar_model.predict_quantiles(
-                well_id=well_id,
-                production_data=production_data,
-                quantiles=quantiles,
-                horizon=horizon,
-                n_samples=500,  # Reasonable default
-            )
-
-            # Return P50 if single quantile, otherwise return dict
-            if quantiles == [0.5] or 0.5 in quantiles:
-                phase = list(forecasts.keys())[0]
-                return forecasts[phase].get(
-                    "q50", forecasts[phase][list(forecasts[phase].keys())[0]]
-                )
-            else:
-                # Return all quantiles as Series with MultiIndex or dict
-                phase = list(forecasts.keys())[0]
-                return forecasts[phase].get(
-                    "q50", forecasts[phase][list(forecasts[phase].keys())[0]]
-                )
-
-        except ImportError:
-            raise ImportError(
-                "DeepAR requires PyTorch. Install with: pip install torch"
-            )
-
-    # Handle TFT model
-    elif model == "tft":
-        try:
-            # TFTForecaster is used via tft_model parameter
-            pass
-
-            if tft_model is None:
-                raise ValueError(
-                    "tft_model required for TFT forecasting. "
-                    "Train using TFTForecaster.fit() first."
-                )
-            if production_data is None or well_id is None:
-                raise ValueError(
-                    "production_data and well_id required for TFT forecasting"
-                )
-
-            # Generate forecast with optional interpretation
-            result = tft_model.predict(
-                well_id=well_id,
-                production_data=production_data,
-                horizon=horizon,
-                return_interpretation=return_interpretation,
-            )
-
-            if return_interpretation:
-                # Return tuple (forecast, interpretation)
-                forecasts, interpretation = result
-                # Return first phase as series for compatibility
-                phase = list(forecasts.keys())[0]
-                if verbose:
-                    logger.debug(
-                        f"TFT forecast with interpretation, horizon: {horizon}"
-                    )
-                return forecasts[phase], interpretation
-            else:
-                # Return first phase as series
-                phase = list(result.keys())[0]
-                if verbose:
-                    logger.debug(f"TFT forecast, horizon: {horizon}")
-                return result[phase]
-
-        except ImportError:
-            raise ImportError("TFT requires PyTorch. Install with: pip install torch")
-
-    # Handle ensemble model
-    elif model == "ensemble":
-        try:
-            from .ensemble import EnsembleForecaster
-
-            forecaster = EnsembleForecaster(
-                models=ensemble_models or ["arps", "arima"],
-                weights=ensemble_weights,
-                method=ensemble_method,
-            )
-            result = forecaster.forecast(
-                series=series,
-                horizon=horizon,
-                arps_kind=kind or "hyperbolic",
-                lstm_model=lstm_model,
-                deepar_model=deepar_model,
-                production_data=production_data,
-                well_id=well_id,
-                quantiles=quantiles,
-                verbose=verbose,
-            )
-            if verbose:
-                logger.debug(
-                    f"Ensemble forecast ({ensemble_method}), horizon: {horizon}"
-                )
-            return result
-
-        except ImportError:
-            raise ImportError(
-                "Ensemble forecasting requires PyTorch for ML models. "
-                "Install with: pip install torch"
-            )
-
     # Handle physics-informed models
-    elif model == "material_balance":
+    if model == "material_balance":
         from .physics_informed import material_balance_forecast
 
         result = material_balance_forecast(
@@ -249,7 +81,7 @@ def forecast(
             logger.debug(f"Material balance forecast, horizon: {horizon}")
         return result
 
-    elif model == "pressure_decline":
+    if model == "pressure_decline":
         # For pressure decline, need pressure data
         # If not provided, raise error
         raise ValueError(

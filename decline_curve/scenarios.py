@@ -9,6 +9,7 @@ from typing import Optional
 
 import numpy as np
 import pandas as pd
+from numpy_financial import npv
 
 from .economics import economic_metrics
 from .logging_config import get_logger
@@ -126,18 +127,24 @@ def run_price_scenarios(
             discount_rate=scenario.discount_rate,
         )
 
+        # Include fixed opex in cash flow for scenario-level economics.
+        scenario_cash_flow = econ["cash_flow"] - scenario.fixed_opex
+        monthly_rate = scenario.discount_rate / 12
+        scenario_npv = npv(monthly_rate, scenario_cash_flow)
+        cumulative_cf = np.cumsum(scenario_cash_flow)
+        payback_month = int(np.argmax(cumulative_cf > 0)) if np.any(cumulative_cf > 0) else -1
+
         # Calculate additional metrics
         total_revenue = np.sum(production_array * price)
         total_opex = np.sum(production_array * scenario.opex) + (
             len(production_array) * scenario.fixed_opex
         )
-        cumulative_cf = np.cumsum(econ["cash_flow"])
 
         result = ScenarioResult(
             scenario_name=scenario.name,
-            npv=econ["npv"],
-            cash_flow=econ["cash_flow"],
-            payback_month=econ["payback_month"],
+            npv=scenario_npv,
+            cash_flow=scenario_cash_flow,
+            payback_month=payback_month,
             cumulative_cash_flow=cumulative_cf,
             total_revenue=total_revenue,
             total_opex=total_opex,
@@ -350,6 +357,15 @@ def _estimate_irr(cash_flow: np.ndarray, initial_guess: float = 0.10) -> float:
         Estimated IRR (annual rate)
     """
     try:
+        cash_flow = np.asarray(cash_flow, dtype=float)
+        if cash_flow.size == 0:
+            return np.nan
+
+        # IRR is only defined when cash flow has at least one negative
+        # and one positive value.
+        if not (np.any(cash_flow < 0) and np.any(cash_flow > 0)):
+            return np.nan
+
         from scipy.optimize import newton
 
         def npv_func(rate):

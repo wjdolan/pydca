@@ -160,8 +160,8 @@ def example_5_physics_informed_neural_networks():
 
     print("\nPhysics-informed constraints are automatically applied to:")
     print("  - LSTM forecasts (EncoderDecoderLSTMForecaster)")
-    print("  - DeepAR forecasts (DeepARForecaster)")
-    print("  - TFT forecasts (TFTForecaster)")
+    print("  - Forecast post-processing constraints")
+    print("  - Physical plausibility checks")
     print("\nConstraints ensure:")
     print("  ✓ Non-negative production rates")
     print("  ✓ Continuity with historical data")
@@ -169,10 +169,9 @@ def example_5_physics_informed_neural_networks():
     print("  ✓ Physical consistency across phases")
 
     print("\nExample usage:")
-    print("  >>> from decline_curve.deep_learning import EncoderDecoderLSTMForecaster")
-    print("  >>> forecaster = EncoderDecoderLSTMForecaster()")
-    print("  >>> forecaster.fit(production_data)")
-    print("  >>> forecast = forecaster.predict(well_id, production_data)")
+    print("  >>> constrained = apply_physics_constraints(raw_forecast)")
+    print("  >>> # apply constraints before publishing")
+    print("  >>> forecast = constrained")
     print("  # Physics constraints are automatically applied!")
 
 

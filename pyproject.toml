@@ -78,14 +78,6 @@ llm = [
     "einops>=0.7",
 ]
 
-# Machine learning models (DeepAR, TFT, etc.)
-ml = [
-    "transformers>=4.41",
-    "torch>=2.0",
-    "accelerate>=0.29",
-    "einops>=0.7",
-    "scikit-learn>=1.3"
-]
 benchmark = [
     "mlflow>=2.0",
     "pyyaml>=6.0"
@@ -124,7 +116,7 @@ examples = [
   "ipykernel>=6.0"
 ]
 all = [
-  "decline-curve[stats,llm,ml,spatial,integrations,dev,docs,examples]"
+  "decline-curve[stats,llm,spatial,integrations,dev,docs,examples]"
 ]
 
 [project.urls]

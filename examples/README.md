@@ -11,7 +11,6 @@ This directory contains practical examples demonstrating the use of the Decline 
 5. **[05_multiphase_forecasting.ipynb](05_multiphase_forecasting.ipynb)** - Multi-phase forecasting (oil + gas + water)
 6. **[06_multi_well_benchmarking.ipynb](06_multi_well_benchmarking.ipynb)** - Comparing models across multiple wells (coming soon)
 7. **[07_ml_forecasting.ipynb](07_ml_forecasting.ipynb)** - Using ARIMA and foundation models for forecasting (coming soon)
-8. **[08_deepar_probabilistic_forecasting.ipynb](08_deepar_probabilistic_forecasting.ipynb)** - Probabilistic forecasting with DeepAR
 
 ## Python Scripts
 

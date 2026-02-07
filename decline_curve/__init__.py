@@ -1,71 +1,56 @@
 """Decline Curve Analysis package.
 
-A comprehensive Python library for decline curve analysis with multi-phase
-forecasting, data utilities, and ML models.
+Keep top-level imports lightweight and lazily load optional helpers to avoid
+triggering optional dependency warnings on `import decline_curve`.
 """
 
-from . import (  # noqa: F401
-    catalog,
-    config,
-    dca,
-    eur_estimation,
-    history_matching,
-    integrations,
-    ipr,
-    material_balance,
-    model_comparison,
-    model_interface,
-    model_registry,
-    monte_carlo,
-    multiphase,
-    multiphase_flow,
-    panel_analysis,
-    panel_analysis_sweep,
-    parameter_resample,
-    physics_informed,
-    physics_reserves,
-    portfolio,
-    probabilistic_forecast,
-    profiling,
-    pvt,
-    risk_report,
-    rta,
-    runner,
-    scenarios,
-    schemas,
-    segmented_decline,
-    spatial_kriging,
-    uncertainty_core,
-    vlp,
-    well_test,
-)
-from .forecast_statistical import (  # noqa: F401
-    calculate_confidence_intervals,
-    holt_winters_forecast,
-    linear_trend_forecast,
-    moving_average_forecast,
-    simple_exponential_smoothing,
-)
-from .logging_config import configure_logging, get_logger  # noqa: F401
-
-try:
-    from . import deep_learning  # noqa: F401
-except ImportError:
-    # Deep learning module requires PyTorch
-    pass
-
-try:
-    from . import ensemble, forecast_deepar, forecast_tft  # noqa: F401
-except ImportError:
-    # DeepAR, ensemble, and TFT modules require PyTorch
-    pass
-
-from .utils import data_processing  # noqa: F401
-
-try:
-    from . import benchmark_factory  # noqa: F401
-except ImportError:
-    # Benchmark factory requires optional dependencies
-    pass
+from . import dca
+from .logging_config import configure_logging, get_logger
 
 __version__ = "0.2.1"
+
+__all__ = [
+    "__version__",
+    "dca",
+    "configure_logging",
+    "get_logger",
+    "calculate_confidence_intervals",
+    "holt_winters_forecast",
+    "linear_trend_forecast",
+    "moving_average_forecast",
+    "simple_exponential_smoothing",
+    "data_processing",
+]
+
+
+def __getattr__(name: str):
+    """Lazily expose selected convenience symbols for backward compatibility."""
+    if name in {
+        "calculate_confidence_intervals",
+        "holt_winters_forecast",
+        "linear_trend_forecast",
+        "moving_average_forecast",
+        "simple_exponential_smoothing",
+    }:
+        from .forecast_statistical import (
+            calculate_confidence_intervals,
+            holt_winters_forecast,
+            linear_trend_forecast,
+            moving_average_forecast,
+            simple_exponential_smoothing,
+        )
+
+        return {
+            "calculate_confidence_intervals": calculate_confidence_intervals,
+            "holt_winters_forecast": holt_winters_forecast,
+            "linear_trend_forecast": linear_trend_forecast,
+            "moving_average_forecast": moving_average_forecast,
+            "simple_exponential_smoothing": simple_exponential_smoothing,
+        }[name]
+
+    if name == "data_processing":
+        from .utils import data_processing
+
+        return data_processing
+
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

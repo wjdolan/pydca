@@ -1,0 +1,20 @@
+Timer unit: 1e-07 s
+
+Total time: 0 s
+File: C:\Users\wjdol\Venv\OGDecline\pydca\examples\profiling_example.py
+Function: forecast_single_well at line 30
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+    30                                           @profile
+    31                                           def forecast_single_well(series):
+    32                                               """
+    33                                               Profile this function to see which lines are slow.
+    34                                           
+    35                                               After running, call print_stats() to see results.
+    36                                               """
+    37                                               # This will show up in profiling results
+    38                                               forecast = dca.forecast(series, model="arps", kind="hyperbolic", horizon=12)
+    39                                               metrics = dca.evaluate(series, forecast)
+    40                                               return forecast, metrics
+
